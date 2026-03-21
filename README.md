@@ -4,7 +4,7 @@
 [![Test Coverage](https://img.shields.io/badge/coverage-76%25-yellow)](https://github.com/quantsingularity/BlockScore/actions)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-## 📊 Blockchain-Based Credit Scoring Platform
+## Blockchain-Based Credit Scoring Platform
 
 BlockScore is an innovative credit scoring platform that leverages blockchain technology and artificial intelligence to create transparent, immutable, and accurate credit profiles for individuals and businesses.
 
