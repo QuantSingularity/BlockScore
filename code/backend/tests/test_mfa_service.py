@@ -282,7 +282,7 @@ class TestMFAService:
             mfa_service, "_encrypt_secret"
         ) as mock_encrypt, patch.object(
             mfa_service, "_update_sms_rate_limit"
-        ) as mock_update:
+        ):
             MockUser.query.get.return_value = mock_user
             mock_rate_limit.return_value = False
             mock_code.return_value = "123456"

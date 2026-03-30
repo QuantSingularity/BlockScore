@@ -84,7 +84,7 @@ def evaluate_model(model: Any, X_test: Any, y_test: Any) -> Any:
     mse = np.mean((predictions - y_test) ** 2)
     rmse = np.sqrt(mse)
     mae = np.mean(np.abs(predictions - y_test))
-    logger.info(f"Model Performance:")
+    logger.info("Model Performance:")
     logger.info(f"Mean Squared Error: {mse:.2f}")
     logger.info(f"Root Mean Squared Error: {rmse:.2f}")
     logger.info(f"Mean Absolute Error: {mae:.2f}")

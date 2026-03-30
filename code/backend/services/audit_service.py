@@ -277,7 +277,7 @@ class AuditService:
     ) -> Dict[str, Any]:
         """Generate compliance report"""
         query = AuditLog.query.filter(
-            AuditLog.compliance_relevant == True,
+            AuditLog.compliance_relevant,
             AuditLog.event_timestamp >= start_date,
             AuditLog.event_timestamp <= end_date,
         )

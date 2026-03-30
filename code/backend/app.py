@@ -334,7 +334,7 @@ def create_app(config_name: str = "default") -> Flask:
                 )
             access_token = create_access_token(identity=user.id)
             refresh_token = create_refresh_token(identity=user.id)
-            session = auth_service.create_session(
+            auth_service.create_session(
                 user_id=user.id,
                 access_token=access_token,
                 refresh_token=refresh_token,

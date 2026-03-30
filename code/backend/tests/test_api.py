@@ -588,7 +588,7 @@ class TestAPIEndpoints:
     def test_logging_and_monitoring(self, client: Any, auth_headers: Any) -> Any:
         """Test that requests are properly logged"""
         with patch("app.logger") as mock_logger:
-            response = client.get("/api/user/profile", headers=auth_headers)
+            client.get("/api/user/profile", headers=auth_headers)
             assert mock_logger.info.called or mock_logger.debug.called
 
     def test_security_headers(self, client: Any) -> Any:

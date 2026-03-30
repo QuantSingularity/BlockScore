@@ -93,7 +93,7 @@ class JobManager:
                 task_options["countdown"] = countdown
             elif eta:
                 task_options["eta"] = eta
-            result = self.celery.send_task(
+            self.celery.send_task(
                 task_name, args=args, kwargs=kwargs, **task_options
             )
             self.job_registry[job_id] = {
