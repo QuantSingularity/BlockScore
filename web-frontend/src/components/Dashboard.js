@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from "react";
 import { Card, CardContent, Typography } from "@mui/material";
 import axios from "axios";
+import { useEffect, useState } from "react";
 
 export default function Dashboard() {
   const [score, setScore] = useState(null);

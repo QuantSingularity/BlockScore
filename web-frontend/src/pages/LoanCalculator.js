@@ -1,34 +1,33 @@
-import React, { useState } from "react";
 import {
   Box,
-  Grid,
-  Typography,
+  Button,
   Card,
   CardContent,
-  Slider,
-  TextField,
-  Button,
-  Paper,
-  Divider,
   CircularProgress,
+  Divider,
+  Grid,
+  Paper,
+  Slider,
+  Typography,
   useTheme,
 } from "@mui/material";
+import {
+  ArcElement,
+  CategoryScale,
+  Chart as ChartJS,
+  Legend,
+  LinearScale,
+  LineElement,
+  PointElement,
+  Title,
+  Tooltip,
+} from "chart.js";
 import { motion } from "framer-motion";
+import { useState } from "react";
+import { Doughnut, Line } from "react-chartjs-2";
 import { useAuth } from "../contexts/AuthContext";
 import { useWeb3 } from "../contexts/Web3Context";
 import { calculateLoan } from "../utils/api";
-import {
-  Chart as ChartJS,
-  ArcElement,
-  Tooltip,
-  Legend,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  Title,
-} from "chart.js";
-import { Doughnut, Line } from "react-chartjs-2";
 
 ChartJS.register(
   ArcElement,
@@ -182,7 +181,7 @@ const LoanCalculator = () => {
                   </Typography>
                   <Slider
                     value={amount}
-                    onChange={(e, newValue) => setAmount(newValue)}
+                    onChange={(_e, newValue) => setAmount(newValue)}
                     min={1000}
                     max={50000}
                     step={500}
@@ -194,7 +193,7 @@ const LoanCalculator = () => {
                   <Typography gutterBottom>Interest Rate: {rate}%</Typography>
                   <Slider
                     value={rate}
-                    onChange={(e, newValue) => setRate(newValue)}
+                    onChange={(_e, newValue) => setRate(newValue)}
                     min={1}
                     max={20}
                     step={0.1}
@@ -206,7 +205,7 @@ const LoanCalculator = () => {
                   <Typography gutterBottom>Loan Term: {term} months</Typography>
                   <Slider
                     value={term}
-                    onChange={(e, newValue) => setTerm(newValue)}
+                    onChange={(_e, newValue) => setTerm(newValue)}
                     min={12}
                     max={60}
                     step={12}
@@ -307,9 +306,8 @@ const LoanCalculator = () => {
                                   },
                                   tooltip: {
                                     callbacks: {
-                                      label: function (context) {
-                                        return `${context.label}: ${context.raw}%`;
-                                      },
+                                      label: (context) =>
+                                        `${context.label}: ${context.raw}%`,
                                     },
                                   },
                                 },

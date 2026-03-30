@@ -1,20 +1,17 @@
-import React, { useState, useEffect } from "react";
-import { Routes, Route, useLocation } from "react-router-dom";
-import { Box, Container } from "@mui/material";
+import { Box } from "@mui/material";
 import { AnimatePresence } from "framer-motion";
-
-// Layouts
-import MainLayout from "./layouts/MainLayout";
-
-// Pages
-import Dashboard from "./pages/Dashboard";
-import LoanCalculator from "./pages/LoanCalculator";
-import Profile from "./pages/Profile";
-import NotFound from "./pages/NotFound";
-import Landing from "./pages/Landing";
-
+import { useEffect, useState } from "react";
+import { Route, Routes, useLocation } from "react-router-dom";
 // Components
 import LoadingScreen from "./components/common/LoadingScreen";
+// Layouts
+import MainLayout from "./layouts/MainLayout";
+// Pages
+import Dashboard from "./pages/Dashboard";
+import Landing from "./pages/Landing";
+import LoanCalculator from "./pages/LoanCalculator";
+import NotFound from "./pages/NotFound";
+import Profile from "./pages/Profile";
 
 function App() {
   const location = useLocation();

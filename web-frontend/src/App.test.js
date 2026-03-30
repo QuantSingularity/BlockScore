@@ -1,12 +1,11 @@
-import React from "react";
+import { ThemeProvider } from "@mui/material";
 import { render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { ThemeProvider } from "@mui/material";
 import App from "./App";
-import theme from "./theme";
 import { AuthProvider } from "./contexts/AuthContext";
-import { Web3Provider } from "./contexts/Web3Context";
 import { CreditProvider } from "./contexts/CreditContext";
+import { Web3Provider } from "./contexts/Web3Context";
+import theme from "./theme";
 
 // Mock contexts
 jest.mock("./contexts/AuthContext", () => ({

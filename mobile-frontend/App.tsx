@@ -1,18 +1,18 @@
-import React, { useEffect } from "react";
-import { Provider } from "react-redux";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
-import { store } from "./src/store";
-import { useAppDispatch, useAppSelector } from "./src/store/hooks";
-import { checkStoredAuth } from "./src/store/slices/authSlice";
+import { useEffect } from "react";
+import { Provider } from "react-redux";
+import CreditHistoryScreen from "./src/screens/CreditHistoryScreen";
+import DashboardScreen from "./src/screens/DashboardScreen";
+import LoanCalculatorScreen from "./src/screens/LoanCalculatorScreen";
 
 // Screens
 import LoginScreen from "./src/screens/LoginScreen";
-import RegisterScreen from "./src/screens/RegisterScreen";
-import DashboardScreen from "./src/screens/DashboardScreen";
-import CreditHistoryScreen from "./src/screens/CreditHistoryScreen";
-import LoanCalculatorScreen from "./src/screens/LoanCalculatorScreen";
 import ProfileScreen from "./src/screens/ProfileScreen";
+import RegisterScreen from "./src/screens/RegisterScreen";
+import { store } from "./src/store";
+import { useAppDispatch, useAppSelector } from "./src/store/hooks";
+import { checkStoredAuth } from "./src/store/slices/authSlice";
 
 const Stack = createNativeStackNavigator();
 

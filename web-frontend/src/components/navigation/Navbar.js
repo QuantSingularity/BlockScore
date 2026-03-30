@@ -1,17 +1,16 @@
-import React from "react";
-import {
-  AppBar,
-  Toolbar,
-  IconButton,
-  Typography,
-  Avatar,
-  Box,
-  Badge,
-  useTheme,
-} from "@mui/material";
+import AccountCircleIcon from "@mui/icons-material/AccountCircle";
 import MenuIcon from "@mui/icons-material/Menu";
 import NotificationsIcon from "@mui/icons-material/Notifications";
-import AccountCircleIcon from "@mui/icons-material/AccountCircle";
+import {
+  AppBar,
+  Avatar,
+  Badge,
+  Box,
+  IconButton,
+  Toolbar,
+  Typography,
+  useTheme,
+} from "@mui/material";
 import { useNavigate } from "react-router-dom";
 
 const Navbar = ({ onDrawerToggle }) => {

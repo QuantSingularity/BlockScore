@@ -1,6 +1,5 @@
-import React from "react";
-import { render, screen } from "@testing-library/react";
 import { ThemeProvider } from "@mui/material";
+import { render, screen } from "@testing-library/react";
 import CreditScoreGauge from "../../components/dashboard/CreditScoreGauge";
 import theme from "../../theme";
 

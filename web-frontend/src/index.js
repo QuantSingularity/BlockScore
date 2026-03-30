@@ -1,12 +1,12 @@
+import { CssBaseline, ThemeProvider } from "@mui/material";
 import React from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
-import { ThemeProvider, CssBaseline } from "@mui/material";
 import App from "./App";
-import theme from "./theme";
 import { AuthProvider } from "./contexts/AuthContext";
-import { Web3Provider } from "./contexts/Web3Context";
 import { CreditProvider } from "./contexts/CreditContext";
+import { Web3Provider } from "./contexts/Web3Context";
+import theme from "./theme";
 import "./index.css";
 
 const container = document.getElementById("root");

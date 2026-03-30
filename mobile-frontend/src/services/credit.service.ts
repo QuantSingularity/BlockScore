@@ -3,8 +3,8 @@
  * Handles credit score and credit history operations
  */
 
-import httpClient from "./http.client";
 import { API_CONFIG } from "../config/api.config";
+import httpClient from "./http.client";
 
 export interface CreditScore {
   score: number;

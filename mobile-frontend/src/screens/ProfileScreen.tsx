@@ -1,23 +1,23 @@
-import React, { useState } from "react";
+import { useNavigation } from "@react-navigation/native";
+import { Icon } from "@rneui/themed";
+import { useState } from "react";
 import {
-  View,
+  ActivityIndicator,
+  Alert,
+  ScrollView,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  StyleSheet,
-  ScrollView,
-  Alert,
-  ActivityIndicator,
+  View,
 } from "react-native";
+import { useAppDispatch, useAppSelector } from "../store/hooks";
+import { logoutUser, updateWallet } from "../store/slices/authSlice";
 import {
   responsiveFontSize,
   responsiveHeight,
   responsiveWidth,
 } from "../utils/responsive";
-import { Icon } from "@rneui/themed";
-import { useNavigation } from "@react-navigation/native";
-import { useAppDispatch, useAppSelector } from "../store/hooks";
-import { logoutUser, updateWallet } from "../store/slices/authSlice";
 
 const colors = {
   primary: "#4A90E2",

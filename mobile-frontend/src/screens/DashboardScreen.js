@@ -1,18 +1,17 @@
-import React from "react";
+import { useNavigation } from "@react-navigation/native"; // Import useNavigation
+import { Icon } from "@rneui/themed";
 import {
-  View,
-  Text,
-  StyleSheet,
   ScrollView,
+  StyleSheet,
+  Text,
   TouchableOpacity,
+  View,
 } from "react-native";
 import {
   responsiveFontSize,
   responsiveHeight,
   responsiveWidth,
 } from "../utils/responsive";
-import { Icon } from "@rneui/themed";
-import { useNavigation } from "@react-navigation/native"; // Import useNavigation
 
 // Define modern color palette
 const colors = {

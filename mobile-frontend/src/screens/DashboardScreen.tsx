@@ -1,26 +1,26 @@
+import { useNavigation } from "@react-navigation/native";
+import { Icon } from "@rneui/themed";
 import React, { useEffect } from "react";
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
   ActivityIndicator,
   RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
-import {
-  responsiveFontSize,
-  responsiveHeight,
-  responsiveWidth,
-} from "../utils/responsive";
-import { Icon } from "@rneui/themed";
-import { useNavigation } from "@react-navigation/native";
 import { useAppDispatch, useAppSelector } from "../store/hooks";
 import {
   fetchCreditScore,
   fetchScoreFactors,
 } from "../store/slices/creditSlice";
 import { fetchBorrowerLoans } from "../store/slices/loanSlice";
+import {
+  responsiveFontSize,
+  responsiveHeight,
+  responsiveWidth,
+} from "../utils/responsive";
 
 const colors = {
   primary: "#4A90E2",
@@ -68,7 +68,7 @@ const DashboardScreen = () => {
 
   useEffect(() => {
     loadData();
-  }, [user?.walletAddress]);
+  }, [loadData]);
 
   const onRefresh = async () => {
     setRefreshing(true);

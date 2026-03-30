@@ -1,9 +1,9 @@
+import { Box } from "@mui/material";
 import React from "react";
 import { Outlet } from "react-router-dom";
-import { Box } from "@mui/material";
+import Footer from "../components/navigation/Footer";
 import Navbar from "../components/navigation/Navbar";
 import Sidebar from "../components/navigation/Sidebar";
-import Footer from "../components/navigation/Footer";
 
 const MainLayout = () => {
   const [mobileOpen, setMobileOpen] = React.useState(false);

@@ -3,9 +3,9 @@
  * Redux slice for loan management
  */
 
-import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
+import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
+import type { Loan, LoanCalculation } from "../../services/loan.service";
 import * as loanService from "../../services/loan.service";
-import { Loan, LoanCalculation } from "../../services/loan.service";
 
 export interface LoanState {
   loans: Loan[];

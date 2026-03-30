@@ -1,21 +1,18 @@
-import React from "react";
+// Icons
+import CalculateIcon from "@mui/icons-material/Calculate";
+import HelpOutlineIcon from "@mui/icons-material/HelpOutline";
+import HistoryIcon from "@mui/icons-material/History";
+import TrendingUpIcon from "@mui/icons-material/TrendingUp";
 import {
   Box,
-  Button,
-  Grid,
   Card,
   CardActionArea,
   CardContent,
+  Grid,
   Typography,
   useTheme,
 } from "@mui/material";
 import { useNavigate } from "react-router-dom";
-
-// Icons
-import CalculateIcon from "@mui/icons-material/Calculate";
-import HistoryIcon from "@mui/icons-material/History";
-import TrendingUpIcon from "@mui/icons-material/TrendingUp";
-import HelpOutlineIcon from "@mui/icons-material/HelpOutline";
 
 const QuickActions = () => {
   const theme = useTheme();

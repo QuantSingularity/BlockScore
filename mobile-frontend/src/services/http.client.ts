@@ -4,13 +4,13 @@
  */
 
 import axios, {
-  AxiosInstance,
-  AxiosRequestConfig,
-  AxiosResponse,
-  AxiosError,
+  type AxiosError,
+  type AxiosInstance,
+  type AxiosRequestConfig,
+  type AxiosResponse,
 } from "axios";
 import { API_CONFIG } from "../config/api.config";
-import { getToken, clearToken } from "./storage.service";
+import { clearToken, getToken } from "./storage.service";
 
 /**
  * Create axios instance with default configuration

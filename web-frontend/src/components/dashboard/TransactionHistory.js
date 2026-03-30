@@ -1,18 +1,18 @@
-import React from "react";
 import {
   Box,
-  Typography,
+  Chip,
+  Divider,
   List,
   ListItem,
   ListItemText,
-  Divider,
-  Chip,
+  Typography,
   useTheme,
 } from "@mui/material";
 import { format } from "date-fns";
+import React from "react";
 
 const TransactionHistory = ({ history }) => {
-  const theme = useTheme();
+  const _theme = useTheme();
 
   // Sort history by timestamp (newest first)
   const sortedHistory = [...history].sort((a, b) => b.timestamp - a.timestamp);

@@ -1,32 +1,30 @@
-import React from "react";
+// Icons
+import AccountBalanceWalletIcon from "@mui/icons-material/AccountBalanceWallet";
+import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+import ErrorIcon from "@mui/icons-material/Error";
+import HistoryIcon from "@mui/icons-material/History";
+import SecurityIcon from "@mui/icons-material/Security";
+import SettingsIcon from "@mui/icons-material/Settings";
 import {
+  Avatar,
   Box,
-  Grid,
-  Typography,
+  Button,
   Card,
   CardContent,
-  Avatar,
+  Chip,
   Divider,
+  Grid,
   List,
   ListItem,
-  ListItemText,
   ListItemIcon,
-  Button,
-  Chip,
+  ListItemText,
   Paper,
+  Typography,
   useTheme,
 } from "@mui/material";
 import { motion } from "framer-motion";
 import { useAuth } from "../contexts/AuthContext";
 import { useWeb3 } from "../contexts/Web3Context";
-
-// Icons
-import AccountBalanceWalletIcon from "@mui/icons-material/AccountBalanceWallet";
-import HistoryIcon from "@mui/icons-material/History";
-import SecurityIcon from "@mui/icons-material/Security";
-import SettingsIcon from "@mui/icons-material/Settings";
-import CheckCircleIcon from "@mui/icons-material/CheckCircle";
-import ErrorIcon from "@mui/icons-material/Error";
 
 const Profile = () => {
   const theme = useTheme();

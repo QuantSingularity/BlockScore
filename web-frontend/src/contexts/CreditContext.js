@@ -1,8 +1,8 @@
-import React, { createContext, useState, useContext, useEffect } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 import {
-  getCreditScore,
-  getCreditHistory,
   calculateCreditScore,
+  getCreditHistory,
+  getCreditScore,
 } from "../utils/api";
 import { useAuth } from "./AuthContext";
 import { useWeb3 } from "./Web3Context";
@@ -35,7 +35,7 @@ export const CreditProvider = ({ children }) => {
       let data;
       try {
         data = await getCreditScore(address);
-      } catch (apiError) {
+      } catch (_apiError) {
         // If blockchain call fails, try calculating with AI
         console.log("Blockchain call failed, trying AI calculation...");
         data = await calculateCreditScore(address);
@@ -113,7 +113,7 @@ export const CreditProvider = ({ children }) => {
     } else {
       setLoading(false);
     }
-  }, [accounts, user]);
+  }, [accounts, user, fetchCreditScore]);
 
   return (
     <CreditContext.Provider

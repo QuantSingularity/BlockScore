@@ -1,26 +1,24 @@
-import React, { useState } from "react";
+import AccountBalanceWalletIcon from "@mui/icons-material/AccountBalanceWallet";
+import CalculateIcon from "@mui/icons-material/Calculate";
+// Icons
+import DashboardIcon from "@mui/icons-material/Dashboard";
+import HelpIcon from "@mui/icons-material/Help";
+import HistoryIcon from "@mui/icons-material/History";
+import SettingsIcon from "@mui/icons-material/Settings";
 import {
+  Box,
+  Divider,
   Drawer,
   List,
   ListItem,
   ListItemIcon,
   ListItemText,
-  Divider,
-  Box,
-  useTheme,
-  useMediaQuery,
-  Collapse,
   Typography,
+  useMediaQuery,
+  useTheme,
 } from "@mui/material";
-import { useNavigate, useLocation } from "react-router-dom";
-
-// Icons
-import DashboardIcon from "@mui/icons-material/Dashboard";
-import CalculateIcon from "@mui/icons-material/Calculate";
-import AccountBalanceWalletIcon from "@mui/icons-material/AccountBalanceWallet";
-import HistoryIcon from "@mui/icons-material/History";
-import SettingsIcon from "@mui/icons-material/Settings";
-import HelpIcon from "@mui/icons-material/Help";
+import { useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 
 const drawerWidth = 240;
 
@@ -28,14 +26,14 @@ const Sidebar = ({ mobileOpen, onDrawerToggle }) => {
   const theme = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
-  const isDesktop = useMediaQuery(theme.breakpoints.up("sm"));
+  const _isDesktop = useMediaQuery(theme.breakpoints.up("sm"));
 
   const [open, setOpen] = useState({
     transactions: false,
     settings: false,
   });
 
-  const handleClick = (section) => {
+  const _handleClick = (section) => {
     setOpen({
       ...open,
       [section]: !open[section],

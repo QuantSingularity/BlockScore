@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { Button, TextField, Paper, Typography } from "@mui/material";
+import { Button, Paper, TextField, Typography } from "@mui/material";
+import { useState } from "react";
 
 export default function LoanCalculator() {
   const [amount, setAmount] = useState(1000);

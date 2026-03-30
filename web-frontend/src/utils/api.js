@@ -15,7 +15,7 @@ const getApiUrl = () => {
 // Create axios instance with default config
 const api = axios.create({
   baseURL: getApiUrl(),
-  timeout: parseInt(process.env.REACT_APP_API_TIMEOUT) || 10000,
+  timeout: parseInt(process.env.REACT_APP_API_TIMEOUT, 10) || 10000,
   headers: {
     "Content-Type": "application/json",
   },

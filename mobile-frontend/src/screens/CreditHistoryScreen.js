@@ -1,20 +1,19 @@
-import React from "react";
+import { useNavigation } from "@react-navigation/native"; // Import useNavigation
+import { Icon } from "@rneui/themed";
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
   Alert,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native"; // Import Alert
+import { LineChart } from "react-native-chart-kit";
 import {
   responsiveFontSize,
   responsiveHeight,
   responsiveWidth,
 } from "../utils/responsive";
-import { LineChart } from "react-native-chart-kit";
-import { Icon } from "@rneui/themed";
-import { useNavigation } from "@react-navigation/native"; // Import useNavigation
 
 // Define modern color palette (same as other screens)
 const colors = {

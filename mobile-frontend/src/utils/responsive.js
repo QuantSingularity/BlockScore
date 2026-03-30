@@ -1,8 +1,8 @@
 import { Dimensions } from "react-native";
 import {
+  responsiveFontSize,
   responsiveHeight,
   responsiveWidth,
-  responsiveFontSize,
 } from "react-native-responsive-dimensions";
 
 const { width, height } = Dimensions.get("window");
@@ -17,12 +17,12 @@ const moderateScale = (size, factor = 0.5) =>
   size + (scale(size) - size) * factor;
 
 export {
+  height,
+  moderateScale,
+  responsiveFontSize,
   responsiveHeight,
   responsiveWidth,
-  responsiveFontSize,
   scale,
   verticalScale,
-  moderateScale,
   width,
-  height,
 };

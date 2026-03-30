@@ -1,10 +1,9 @@
-import React from "react";
 import {
   Box,
-  Typography,
-  LinearProgress,
   Grid,
+  LinearProgress,
   Paper,
+  Typography,
   useTheme,
 } from "@mui/material";
 

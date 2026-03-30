@@ -1,30 +1,26 @@
-import React from "react";
 import {
   Box,
-  Grid,
-  Typography,
   Card,
   CardContent,
-  CircularProgress,
-  Button,
-  Divider,
-  Paper,
   Chip,
+  CircularProgress,
+  Divider,
+  Grid,
+  Typography,
   useTheme,
 } from "@mui/material";
 import { motion } from "framer-motion";
-import { useAuth } from "../contexts/AuthContext";
-import { useWeb3 } from "../contexts/Web3Context";
-import { useCredit } from "../contexts/CreditContext";
-
+import CreditFactors from "../components/dashboard/CreditFactors";
 // Components
 import CreditScoreGauge from "../components/dashboard/CreditScoreGauge";
-import TransactionHistory from "../components/dashboard/TransactionHistory";
-import CreditFactors from "../components/dashboard/CreditFactors";
 import QuickActions from "../components/dashboard/QuickActions";
+import TransactionHistory from "../components/dashboard/TransactionHistory";
+import { useAuth } from "../contexts/AuthContext";
+import { useCredit } from "../contexts/CreditContext";
+import { useWeb3 } from "../contexts/Web3Context";
 
 const Dashboard = () => {
-  const theme = useTheme();
+  const _theme = useTheme();
   const { user } = useAuth();
   const { accounts } = useWeb3();
   const { creditData, loading, error, fetchCreditScore } = useCredit();

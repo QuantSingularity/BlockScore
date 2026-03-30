@@ -3,9 +3,9 @@
  * Redux slice for credit score and history management
  */
 
-import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
+import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
+import type { CreditHistory, CreditScore } from "../../services/credit.service";
 import * as creditService from "../../services/credit.service";
-import { CreditScore, CreditHistory } from "../../services/credit.service";
 
 export interface CreditState {
   score: CreditScore | null;

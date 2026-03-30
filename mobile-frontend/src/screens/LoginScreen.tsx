@@ -1,24 +1,24 @@
+import { Icon } from "@rneui/themed";
 import React, { useState } from "react";
 import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
+  ActivityIndicator,
+  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  ActivityIndicator,
-  Alert,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
+import { useAppDispatch, useAppSelector } from "../store/hooks";
+import { clearError, loginUser } from "../store/slices/authSlice";
 import {
   responsiveFontSize,
   responsiveHeight,
   responsiveWidth,
 } from "../utils/responsive";
-import { Icon } from "@rneui/themed";
-import { useAppDispatch, useAppSelector } from "../store/hooks";
-import { loginUser, clearError } from "../store/slices/authSlice";
 
 const colors = {
   primary: "#4A90E2",

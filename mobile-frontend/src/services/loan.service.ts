@@ -3,8 +3,8 @@
  * Handles loan operations and calculations
  */
 
-import httpClient from "./http.client";
 import { API_CONFIG } from "../config/api.config";
+import httpClient from "./http.client";
 
 export interface Loan {
   loanId: number;
@@ -128,8 +128,8 @@ export const calculateLoan = (
   }
 
   const monthlyPayment =
-    (principal * monthlyRate * Math.pow(1 + monthlyRate, numberOfPayments)) /
-    (Math.pow(1 + monthlyRate, numberOfPayments) - 1);
+    (principal * monthlyRate * (1 + monthlyRate) ** numberOfPayments) /
+    ((1 + monthlyRate) ** numberOfPayments - 1);
 
   const totalPayment = monthlyPayment * numberOfPayments;
   const totalInterest = totalPayment - principal;
@@ -138,9 +138,9 @@ export const calculateLoan = (
     loanAmount,
     interestRate,
     loanTerm,
-    monthlyPayment: isNaN(monthlyPayment) ? 0 : monthlyPayment,
-    totalPayment: isNaN(totalPayment) ? 0 : totalPayment,
-    totalInterest: isNaN(totalInterest) ? 0 : totalInterest,
+    monthlyPayment: Number.isNaN(monthlyPayment) ? 0 : monthlyPayment,
+    totalPayment: Number.isNaN(totalPayment) ? 0 : totalPayment,
+    totalInterest: Number.isNaN(totalInterest) ? 0 : totalInterest,
   };
 };
 

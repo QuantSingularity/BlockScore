@@ -3,13 +3,13 @@
  * Handles user authentication, registration, and wallet management
  */
 
-import httpClient from "./http.client";
 import { API_CONFIG } from "../config/api.config";
+import httpClient from "./http.client";
 import {
+  clearAll,
   saveToken,
   saveUser,
   saveWalletAddress,
-  clearAll,
 } from "./storage.service";
 
 export interface LoginRequest {

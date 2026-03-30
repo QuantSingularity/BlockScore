@@ -1,19 +1,19 @@
+import { useNavigation } from "@react-navigation/native"; // Import useNavigation
+import { Icon, Slider } from "@rneui/themed"; // Import Icon
 import React from "react";
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
   Alert,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native"; // Import Alert
 import {
   responsiveFontSize,
   responsiveHeight,
   responsiveWidth,
 } from "../utils/responsive";
-import { Slider, Icon } from "@rneui/themed"; // Import Icon
-import { useNavigation } from "@react-navigation/native"; // Import useNavigation
 
 // Define modern color palette (same as other screens)
 const colors = {
@@ -48,10 +48,10 @@ const LoanCalculatorScreen = () => {
     }
 
     const monthlyPayment =
-      (principal * monthlyRate * Math.pow(1 + monthlyRate, numberOfPayments)) /
-      (Math.pow(1 + monthlyRate, numberOfPayments) - 1);
+      (principal * monthlyRate * (1 + monthlyRate) ** numberOfPayments) /
+      ((1 + monthlyRate) ** numberOfPayments - 1);
 
-    return isNaN(monthlyPayment) || !isFinite(monthlyPayment)
+    return Number.isNaN(monthlyPayment) || !Number.isFinite(monthlyPayment)
       ? "0.00"
       : monthlyPayment.toFixed(2);
   };
@@ -72,7 +72,7 @@ const LoanCalculatorScreen = () => {
   const formatNumber = (num) => {
     // Ensure num is a number before formatting
     const numberValue = parseFloat(num);
-    if (isNaN(numberValue)) {
+    if (Number.isNaN(numberValue)) {
       return "0";
     }
     return numberValue.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");

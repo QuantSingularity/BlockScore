@@ -1,20 +1,19 @@
-import React from "react";
-import { motion } from "framer-motion";
-import {
-  Box,
-  Typography,
-  Button,
-  Container,
-  Grid,
-  Card,
-  CardContent,
-  useTheme,
-} from "@mui/material";
-import { useNavigate } from "react-router-dom";
+import AccountBalanceIcon from "@mui/icons-material/AccountBalance";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import SecurityIcon from "@mui/icons-material/Security";
 import SpeedIcon from "@mui/icons-material/Speed";
-import AccountBalanceIcon from "@mui/icons-material/AccountBalance";
+import {
+  Box,
+  Button,
+  Card,
+  CardContent,
+  Container,
+  Grid,
+  Typography,
+  useTheme,
+} from "@mui/material";
+import { motion } from "framer-motion";
+import { useNavigate } from "react-router-dom";
 
 const Landing = () => {
   const theme = useTheme();

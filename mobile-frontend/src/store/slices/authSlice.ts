@@ -3,11 +3,11 @@
  * Redux slice for authentication state management
  */
 
-import { createSlice, createAsyncThunk, PayloadAction } from "@reduxjs/toolkit";
+import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
 import * as authService from "../../services/auth.service";
 import {
-  getUser,
   getToken,
+  getUser,
   getWalletAddress,
 } from "../../services/storage.service";
 

@@ -1,4 +1,4 @@
-import React, { createContext, useState, useContext, useEffect } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 import Web3 from "web3";
 
 // Create context
@@ -41,7 +41,7 @@ export const Web3Provider = ({ children }) => {
             window.ethereum.on("chainChanged", () => {
               window.location.reload();
             });
-          } catch (error) {
+          } catch (_error) {
             // User denied account access
             console.error("User denied account access");
             setError("Please connect your wallet to use this application");
