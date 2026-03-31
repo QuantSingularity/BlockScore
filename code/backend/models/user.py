@@ -5,10 +5,11 @@ User models for BlockScore Backend
 import enum
 import uuid
 from datetime import datetime, timedelta, timezone
+from typing import Any, Dict
+
 from flask_bcrypt import Bcrypt
 from flask_sqlalchemy import SQLAlchemy
 from marshmallow import Schema, ValidationError, fields, validate
-from typing import Any, Dict
 
 db = SQLAlchemy()
 bcrypt = Bcrypt()

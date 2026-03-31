@@ -1,11 +1,12 @@
-from typing import Any
+import logging
 import os
+from typing import Any
+
 import joblib
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
 from xgboost import XGBRegressor
-import logging
 
 logging.basicConfig(
     level=logging.INFO,

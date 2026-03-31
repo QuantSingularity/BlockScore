@@ -7,17 +7,18 @@ import base64
 import hashlib
 import io
 import json
+import logging
 import secrets
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
+
 import pyotp
 import qrcode
 import redis
 from flask_bcrypt import Bcrypt
 from models.audit import AuditEventType, AuditLog, AuditSeverity
 from models.user import KYCStatus, User, UserProfile, UserSession, UserStatus
-import logging
 
 logging.basicConfig(
     level=logging.INFO,

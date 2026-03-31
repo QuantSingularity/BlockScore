@@ -6,12 +6,13 @@ Tests for all API endpoints, authentication, and error handling
 import json
 import os
 import sys
+import threading
 from datetime import datetime, timedelta
+from typing import Any
 from unittest.mock import Mock, patch
+
 import jwt
 import pytest
-from typing import Any
-import threading
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from app import create_app

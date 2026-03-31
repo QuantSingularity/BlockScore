@@ -7,10 +7,13 @@ import sys
 import tempfile
 from datetime import datetime, timezone
 from unittest.mock import Mock
+
 import pytest
 import redis
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from typing import Any
+
 from app import create_app
 from models import db as _db
 from models.audit import AuditLog
@@ -23,7 +26,6 @@ from services.compliance_service import ComplianceService
 from services.credit_service import CreditScoringService
 from utils.cache import CacheManager
 from utils.monitoring import PerformanceMonitor
-from typing import Any
 
 
 @pytest.fixture(scope="session")

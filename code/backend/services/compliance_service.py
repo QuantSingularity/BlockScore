@@ -9,6 +9,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Any, Dict, List
+
 from models.audit import ComplianceRecord, ComplianceStatus, ComplianceType
 from models.credit import CreditHistory
 from models.loan import LoanApplication

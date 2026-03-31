@@ -5,7 +5,10 @@ Financial Industry Standards Implementation
 
 import logging
 import traceback
+import uuid
 from datetime import datetime, timezone
+from typing import Any, Dict, Tuple
+
 import redis
 from config import get_config
 from flask import Flask, g, jsonify, request
@@ -31,9 +34,6 @@ from services.auth_service import AuthService
 from services.blockchain_service import BlockchainService
 from services.compliance_service import ComplianceService
 from services.credit_service import CreditScoringService
-from typing import Any, Dict, Tuple
-import uuid
-import logging
 
 logging.basicConfig(
     level=logging.INFO,

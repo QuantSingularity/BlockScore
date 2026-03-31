@@ -9,6 +9,7 @@ import os
 import sys
 from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
+
 import pytest
 from flask import Flask
 from sqlalchemy import create_engine

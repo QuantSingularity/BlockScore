@@ -4,10 +4,11 @@ Unit tests for Credit Scoring Service
 
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
+from typing import Any
 from unittest.mock import patch
+
 from models.credit import CreditEventType, CreditHistory, CreditScore
 from models.user import User, UserProfile
-from typing import Any
 
 
 class TestCreditScoringService:

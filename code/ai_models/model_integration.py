@@ -5,13 +5,14 @@ This module provides utilities for integrating the Python scoring model with the
 It includes functions for data transformation, model inference, and API communication.
 """
 
-from typing import Any, Dict
+import logging
 import os
 from datetime import datetime
+from typing import Any, Dict
+
 import joblib
 import numpy as np
 import pandas as pd
-import logging
 
 logging.basicConfig(
     level=logging.INFO,

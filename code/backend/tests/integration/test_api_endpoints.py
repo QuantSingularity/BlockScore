@@ -2,10 +2,11 @@
 Integration tests for API endpoints
 """
 
+from typing import Any
 from unittest.mock import patch
+
 from models.loan import LoanApplication
 from models.user import User
-from typing import Any
 
 
 class TestAuthenticationEndpoints:

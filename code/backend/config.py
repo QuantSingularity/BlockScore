@@ -5,6 +5,7 @@ Configuration management for BlockScore Backend
 import os
 from datetime import timedelta
 from typing import Type
+
 from dotenv import load_dotenv
 
 load_dotenv()

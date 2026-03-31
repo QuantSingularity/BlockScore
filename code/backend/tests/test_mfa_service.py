@@ -10,6 +10,7 @@ import os
 import sys
 from datetime import datetime, timedelta, timezone
 from unittest.mock import Mock, patch
+
 import pyotp
 import pytest
 

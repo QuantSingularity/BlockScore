@@ -6,9 +6,10 @@ import enum
 import json
 import uuid
 from datetime import datetime, timezone
+from typing import Any, Dict
+
 from flask_sqlalchemy import SQLAlchemy
 from marshmallow import Schema, fields, validate
-from typing import Any, Dict
 
 db = SQLAlchemy()
 
