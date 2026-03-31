@@ -274,12 +274,12 @@ class CacheManager:
             health["error"] = "Redis not available"
             return health
         try:
-            start_time = datetime.now()
+            start_time = datetime.now(timezone.utc)
             test_key = f"health_check_{int(start_time.timestamp())}"
             self.redis.set(test_key, "test", ex=10)
             value = self.redis.get(test_key)
             self.redis.delete(test_key)
-            end_time = datetime.now()
+            end_time = datetime.now(timezone.utc)
             latency = (end_time - start_time).total_seconds() * 1000
             health["available"] = value == b"test"
             health["latency_ms"] = round(latency, 2)

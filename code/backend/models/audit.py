@@ -8,10 +8,8 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, List
 
-from flask_sqlalchemy import SQLAlchemy
+from extensions import db
 from marshmallow import Schema, fields, validate
-
-db = SQLAlchemy()
 
 
 class AuditEventType(enum.Enum):
@@ -374,8 +372,8 @@ class AuditLogQuerySchema(Schema):
     user_id = fields.Str(allow_none=True)
     start_date = fields.DateTime(allow_none=True)
     end_date = fields.DateTime(allow_none=True)
-    page = fields.Int(validate=validate.Range(min=1), missing=1)
-    per_page = fields.Int(validate=validate.Range(min=1, max=100), missing=20)
+    page = fields.Int(validate=validate.Range(min=1), load_default=1)
+    per_page = fields.Int(validate=validate.Range(min=1, max=100), load_default=20)
 
 
 class ComplianceReportSchema(Schema):
@@ -390,5 +388,5 @@ class ComplianceReportSchema(Schema):
     entity_type = fields.Str(allow_none=True)
     start_date = fields.DateTime(allow_none=True)
     end_date = fields.DateTime(allow_none=True)
-    include_violations = fields.Bool(missing=True)
-    include_remediation = fields.Bool(missing=True)
+    include_violations = fields.Bool(load_default=True)
+    include_remediation = fields.Bool(load_default=True)

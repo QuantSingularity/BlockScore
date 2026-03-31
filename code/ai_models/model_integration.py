@@ -7,7 +7,6 @@ It includes functions for data transformation, model inference, and API communic
 
 import logging
 import os
-from datetime import datetime
 from typing import Any, Dict
 
 import joblib
@@ -23,7 +22,14 @@ logger = logging.getLogger(__name__)
 model_path = os.path.join(
     os.path.dirname(os.path.abspath(__file__)), "credit_scoring_model.pkl"
 )
-model = joblib.load(model_path)
+try:
+    model = joblib.load(model_path)
+    logger.info("Credit scoring model loaded successfully")
+except Exception as e:
+    logger.warning(
+        f"Could not load model from {model_path}: {e}. Using fallback scoring."
+    )
+    model = None
 
 
 def transform_blockchain_data(credit_history: Any) -> Any:
@@ -42,7 +48,6 @@ def transform_blockchain_data(credit_history: Any) -> Any:
     """
     if not credit_history:
         return None
-    datetime.now().timestamp()
     income_proxy = 0
     debt_ratio = 0
     payment_history = 0
@@ -87,7 +92,7 @@ def transform_blockchain_data(credit_history: Any) -> Any:
     return features
 
 
-def predict_score(features: Any) -> Dict[str, Any]:
+def predict_score(features: Any) -> int:
     """
     Predict credit score based on features
 
@@ -101,8 +106,14 @@ def predict_score(features: Any) -> Dict[str, Any]:
     int
         Predicted credit score (300-850)
     """
-    df = pd.DataFrame([features])
-    prediction = model.predict(df)[0]
+    if model is not None:
+        df = pd.DataFrame([features])
+        prediction = model.predict(df)[0]
+    else:
+        # Rule-based fallback when model is not loaded
+        payment_history = features.get("payment_history", 0.5)
+        debt_ratio = features.get("debt_ratio", 0.5)
+        prediction = 300 + (payment_history * 350) + ((1 - debt_ratio) * 200)
     prediction = max(300, min(850, prediction))
     return int(prediction)
 

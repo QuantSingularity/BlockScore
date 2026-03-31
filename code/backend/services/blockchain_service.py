@@ -10,6 +10,7 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Any, Dict, List
 
+from extensions import db
 from models.blockchain import (
     BlockchainTransaction,
     ContractStatus,
@@ -96,7 +97,7 @@ class BlockchainService:
             signed_txn = self.web3.eth.account.sign_transaction(
                 transaction, private_key=self.config.get("BLOCKCHAIN_PRIVATE_KEY")
             )
-            tx_hash = self.web3.eth.send_raw_transaction(signed_txn.rawTransaction)
+            tx_hash = self.web3.eth.send_raw_transaction(signed_txn.raw_transaction)
             tx_hash_hex = tx_hash.hex()
             blockchain_tx = self._create_blockchain_transaction(
                 transaction_hash=tx_hash_hex,
@@ -165,7 +166,7 @@ class BlockchainService:
             signed_txn = self.web3.eth.account.sign_transaction(
                 transaction, private_key=self.config.get("BLOCKCHAIN_PRIVATE_KEY")
             )
-            tx_hash = self.web3.eth.send_raw_transaction(signed_txn.rawTransaction)
+            tx_hash = self.web3.eth.send_raw_transaction(signed_txn.raw_transaction)
             tx_hash_hex = tx_hash.hex()
             blockchain_tx = self._create_blockchain_transaction(
                 transaction_hash=tx_hash_hex,
@@ -224,7 +225,7 @@ class BlockchainService:
             signed_txn = self.web3.eth.account.sign_transaction(
                 transaction, private_key=self.config.get("BLOCKCHAIN_PRIVATE_KEY")
             )
-            tx_hash = self.web3.eth.send_raw_transaction(signed_txn.rawTransaction)
+            tx_hash = self.web3.eth.send_raw_transaction(signed_txn.raw_transaction)
             tx_hash_hex = tx_hash.hex()
             blockchain_tx = self._create_blockchain_transaction(
                 transaction_hash=tx_hash_hex,
@@ -294,7 +295,7 @@ class BlockchainService:
     def update_transaction_status(self, transaction_id: str) -> bool:
         """Update blockchain transaction status in database"""
         try:
-            blockchain_tx = BlockchainTransaction.query.get(transaction_id)
+            blockchain_tx = db.session.get(BlockchainTransaction, transaction_id)
             if not blockchain_tx:
                 return False
             status_info = self.get_transaction_status(blockchain_tx.transaction_hash)
@@ -373,7 +374,7 @@ class BlockchainService:
             signed_txn = self.web3.eth.account.sign_transaction(
                 transaction, private_key=self.config.get("BLOCKCHAIN_PRIVATE_KEY")
             )
-            tx_hash = self.web3.eth.send_raw_transaction(signed_txn.rawTransaction)
+            tx_hash = self.web3.eth.send_raw_transaction(signed_txn.raw_transaction)
             tx_hash_hex = tx_hash.hex()
             receipt = self.web3.eth.wait_for_transaction_receipt(
                 tx_hash, timeout=self.transaction_timeout

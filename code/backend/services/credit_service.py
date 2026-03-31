@@ -4,12 +4,14 @@ Advanced AI-powered credit scoring with blockchain integration
 """
 
 import logging
+import os
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 import joblib
 import pandas as pd
+from extensions import db
 from models.blockchain import BlockchainTransaction
 from models.credit import (
     CreditEventType,
@@ -54,7 +56,7 @@ class CreditScoringService:
     ) -> Dict[str, Any]:
         """Calculate comprehensive credit score for user"""
         try:
-            user = User.query.get(user_id)
+            user = db.session.get(User, user_id)
             if not user:
                 raise ValueError("User not found")
             if not force_recalculation:
@@ -154,7 +156,7 @@ class CreditScoringService:
 
     def get_score_explanation(self, credit_score_id: str) -> Dict[str, Any]:
         """Get detailed explanation of credit score calculation"""
-        credit_score = CreditScore.query.get(credit_score_id)
+        credit_score = db.session.get(CreditScore, credit_score_id)
         if not credit_score:
             raise ValueError("Credit score not found")
         factors = CreditFactor.query.filter_by(credit_score_id=credit_score_id).all()
@@ -188,7 +190,11 @@ class CreditScoringService:
     def _load_model(self) -> Any:
         """Load AI model for credit scoring"""
         try:
-            model_path = "../ai_models/credit_scoring_model.pkl"
+            model_path = os.path.join(
+                os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                "ai_models",
+                "credit_scoring_model.pkl",
+            )
             self.model = joblib.load(model_path)
             self.logger.info("Credit scoring model loaded successfully")
         except Exception as e:
@@ -693,7 +699,7 @@ class CreditScoringService:
         self, user_id: str, scenario: Dict[str, Any]
     ) -> Dict[str, Any]:
         """Apply scenario changes to scoring data"""
-        user = User.query.get(user_id)
+        user = db.session.get(User, user_id)
         if not user:
             raise ValueError("User not found")
         modified_data = self._gather_scoring_data(user)

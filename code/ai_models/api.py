@@ -9,10 +9,13 @@ from flask import Flask, jsonify, request
 
 app = Flask(__name__)
 model_path = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    os.path.dirname(os.path.abspath(__file__)),
     "credit_scoring_model.pkl",
 )
-model = joblib.load(model_path)
+try:
+    model = joblib.load(model_path)
+except Exception:
+    model = None
 
 
 def preprocess_blockchain_data(credit_history: Any) -> Any:
@@ -31,7 +34,6 @@ def preprocess_blockchain_data(credit_history: Any) -> Any:
     """
     if not credit_history:
         return None
-    datetime.now().timestamp()
     income_proxy = 0
     debt_ratio = 0
     payment_history = 0

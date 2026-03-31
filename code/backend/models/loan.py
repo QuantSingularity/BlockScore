@@ -8,10 +8,8 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict
 
-from flask_sqlalchemy import SQLAlchemy
+from extensions import db
 from marshmallow import Schema, fields, validate
-
-db = SQLAlchemy()
 
 
 class LoanStatus(enum.Enum):
@@ -106,12 +104,13 @@ class LoanApplication(db.Model):
     )
     loan = db.relationship("Loan", backref="application", uselist=False)
 
-    def generate_application_number(self) -> str:
+    @staticmethod
+    def generate_application_number() -> str:
         """Generate unique application number"""
-        timestamp = datetime.now().strftime("%Y%m%d")
-        import random
+        import secrets
 
-        random_part = str(random.randint(1000, 9999))
+        timestamp = datetime.now(timezone.utc).strftime("%Y%m%d")
+        random_part = str(secrets.randbelow(9000) + 1000)
         return f"APP{timestamp}{random_part}"
 
     def get_application_data(self) -> Dict[str, Any]:
@@ -230,12 +229,13 @@ class Loan(db.Model):
         "LoanPayment", backref="loan", cascade="all, delete-orphan"
     )
 
-    def generate_loan_number(self) -> str:
+    @staticmethod
+    def generate_loan_number() -> str:
         """Generate unique loan number"""
-        timestamp = datetime.now().strftime("%Y%m%d")
-        import random
+        import secrets
 
-        random_part = str(random.randint(10000, 99999))
+        timestamp = datetime.now(timezone.utc).strftime("%Y%m%d")
+        random_part = str(secrets.randbelow(90000) + 10000)
         return f"LN{timestamp}{random_part}"
 
     def calculate_remaining_balance(self) -> float:
@@ -341,13 +341,13 @@ class LoanPayment(db.Model):
         """Check if payment is late"""
         if self.status == PaymentStatus.COMPLETED:
             return False
-        return datetime.now().date() > self.due_date
+        return datetime.now(timezone.utc).date() > self.due_date
 
     def days_late(self) -> int:
         """Calculate days late"""
         if not self.is_late():
             return 0
-        return (datetime.now().date() - self.due_date).days
+        return (datetime.now(timezone.utc).date() - self.due_date).days
 
     def get_processor_response(self) -> Dict[str, Any]:
         """Get parsed processor response"""
@@ -410,7 +410,7 @@ class LoanApplicationSchema(Schema):
     requested_rate = fields.Float(
         validate=validate.Range(min=0, max=100), allow_none=True
     )
-    application_data = fields.Dict(missing={})
+    application_data = fields.Dict(load_default={})
 
 
 class LoanApplicationResponseSchema(Schema):

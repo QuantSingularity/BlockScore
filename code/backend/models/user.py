@@ -7,12 +7,8 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict
 
-from flask_bcrypt import Bcrypt
-from flask_sqlalchemy import SQLAlchemy
-from marshmallow import Schema, ValidationError, fields, validate
-
-db = SQLAlchemy()
-bcrypt = Bcrypt()
+from extensions import bcrypt, db
+from marshmallow import Schema, ValidationError, fields, validate, validates_schema
 
 
 class UserStatus(enum.Enum):
@@ -239,9 +235,12 @@ class UserRegistrationSchema(Schema):
     password = fields.Str(required=True, validate=validate.Length(min=8, max=128))
     confirm_password = fields.Str(required=True)
 
+    @validates_schema
     def validate_passwords_match(self, data: Any, **kwargs) -> Any:
         if data.get("password") != data.get("confirm_password"):
-            raise ValidationError("Passwords do not match")
+            raise ValidationError(
+                "Passwords do not match", field_name="confirm_password"
+            )
 
 
 class UserLoginSchema(Schema):
@@ -249,7 +248,7 @@ class UserLoginSchema(Schema):
 
     email = fields.Email(required=True)
     password = fields.Str(required=True)
-    remember_me = fields.Bool(missing=False)
+    remember_me = fields.Bool(load_default=False)
     mfa_code = fields.Str(validate=validate.Length(equal=6), allow_none=True)
 
 

@@ -11,8 +11,8 @@ from typing import Any, Dict, Tuple
 
 import redis
 from config import get_config
+from extensions import bcrypt, db, ma
 from flask import Flask, g, jsonify, request
-from flask_bcrypt import Bcrypt
 from flask_cors import CORS
 from flask_jwt_extended import (
     JWTManager,
@@ -24,10 +24,9 @@ from flask_jwt_extended import (
 )
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
-from models import db, ma
 from models.audit import AuditEventType, AuditSeverity
 from models.credit import CreditHistory, CreditScore
-from models.loan import LoanApplication, LoanApplicationSchema, LoanStatus
+from models.loan import LoanApplication, LoanApplicationSchema, LoanStatus, LoanType
 from models.user import User, UserLoginSchema, UserRegistrationSchema
 from services.audit_service import AuditService
 from services.auth_service import AuthService
@@ -49,9 +48,9 @@ def create_app(config_name: str = "default") -> Flask:
     app.config.from_object(config_class)
     db.init_app(app)
     ma.init_app(app)
-    CORS(app, origins="*", methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"])
+    bcrypt.init_app(app)
+    CORS(app, origins=app.config.get("CORS_ORIGINS", "*"), supports_credentials=True)
     jwt = JWTManager(app)
-    bcrypt = Bcrypt(app)
     try:
         redis_client = redis.from_url(app.config["REDIS_URL"])
         redis_client.ping()
@@ -59,9 +58,11 @@ def create_app(config_name: str = "default") -> Flask:
         logger.info(f"Redis connection failed: {e}")
         redis_client = None
     limiter = Limiter(
-        app,
         key_func=get_remote_address,
-        storage_uri=app.config["RATELIMIT_STORAGE_URL"] if redis_client else None,
+        app=app,
+        storage_uri=(
+            app.config["RATELIMIT_STORAGE_URL"] if redis_client else "memory://"
+        ),
         default_limits=[app.config["RATELIMIT_DEFAULT"]],
     )
     auth_service = AuthService(db, bcrypt, redis_client)
@@ -69,13 +70,30 @@ def create_app(config_name: str = "default") -> Flask:
     blockchain_service = BlockchainService(app.config)
     audit_service = AuditService(db)
     ComplianceService(db)
-    blacklisted_tokens = set()
+    blacklisted_tokens: set = set()
+
+    def _is_token_revoked(jti: str) -> bool:
+        if redis_client:
+            try:
+                return redis_client.get(f"blocklist:{jti}") is not None
+            except Exception:
+                pass
+        return jti in blacklisted_tokens
+
+    def _revoke_token(jti: str, expires_delta: int = 900) -> None:
+        if redis_client:
+            try:
+                redis_client.setex(f"blocklist:{jti}", expires_delta, "1")
+                return
+            except Exception:
+                pass
+        blacklisted_tokens.add(jti)
 
     @jwt.token_in_blocklist_loader
     def check_if_token_revoked(
         jwt_header: Dict[str, Any], jwt_payload: Dict[str, Any]
     ) -> bool:
-        return jwt_payload["jti"] in blacklisted_tokens
+        return _is_token_revoked(jwt_payload["jti"])
 
     @app.before_request
     def before_request() -> None:
@@ -390,7 +408,7 @@ def create_app(config_name: str = "default") -> Flask:
         try:
             user_id = get_jwt_identity()
             jti = get_jwt()["jti"]
-            blacklisted_tokens.add(jti)
+            _revoke_token(jti)
             auth_service.revoke_session(user_id)
             audit_service.log_event(
                 event_type=AuditEventType.USER_LOGOUT,
@@ -413,6 +431,53 @@ def create_app(config_name: str = "default") -> Flask:
                 500,
             )
 
+    @app.route("/api/auth/refresh", methods=["POST"])
+    @jwt_required(refresh=True)
+    def refresh_token() -> Tuple[Any, int]:
+        """Refresh access token endpoint"""
+        try:
+            user_id = get_jwt_identity()
+            jti = get_jwt()["jti"]
+            _revoke_token(jti, expires_delta=604800)
+            user = db.session.get(User, user_id)
+            if not user or user.is_locked():
+                return (
+                    jsonify(
+                        {
+                            "success": False,
+                            "error": "Unauthorized",
+                            "message": "Unable to refresh token.",
+                        }
+                    ),
+                    401,
+                )
+            new_access_token = create_access_token(identity=user_id)
+            new_refresh_token = create_refresh_token(identity=user_id)
+            return (
+                jsonify(
+                    {
+                        "success": True,
+                        "tokens": {
+                            "access_token": new_access_token,
+                            "refresh_token": new_refresh_token,
+                        },
+                    }
+                ),
+                200,
+            )
+        except Exception as e:
+            app.logger.error(f"Token refresh error: {e}")
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "error": "Refresh Failed",
+                        "message": "An error occurred during token refresh.",
+                    }
+                ),
+                500,
+            )
+
     @app.route("/api/credit/calculate-score", methods=["POST"])
     @jwt_required()
     @limiter.limit("10 per minute")
@@ -423,7 +488,7 @@ def create_app(config_name: str = "default") -> Flask:
             data = request.json or {}
             wallet_address = data.get("walletAddress")
             if not wallet_address:
-                user = User.query.get(user_id)
+                user = db.session.get(User, user_id)
                 if user and user.profile:
                     wallet_address = user.profile.wallet_address
             if not wallet_address:
@@ -524,8 +589,8 @@ def create_app(config_name: str = "default") -> Flask:
             data = schema.load(request.json)
             application = LoanApplication(
                 user_id=user_id,
-                application_number=LoanApplication().generate_application_number(),
-                loan_type=data["loan_type"],
+                application_number=LoanApplication.generate_application_number(),
+                loan_type=LoanType(data["loan_type"]),
                 requested_amount=data["requested_amount"],
                 requested_term_months=data["requested_term_months"],
                 requested_rate=data.get("requested_rate"),
@@ -656,7 +721,7 @@ def create_app(config_name: str = "default") -> Flask:
 
         try:
             user_id = get_jwt_identity()
-            user = User.query.get(user_id)
+            user = db.session.get(User, user_id)
             if not user:
                 return (
                     jsonify(

@@ -8,10 +8,8 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict
 
-from flask_sqlalchemy import SQLAlchemy
+from extensions import db
 from marshmallow import Schema, fields, validate
-
-db = SQLAlchemy()
 
 
 class CreditScoreStatus(enum.Enum):
@@ -338,6 +336,6 @@ class CreditScoreCalculationRequest(Schema):
     """Schema for credit score calculation request"""
 
     user_id = fields.Str(required=True)
-    force_recalculation = fields.Bool(missing=False)
-    include_factors = fields.Bool(missing=True)
-    model_version = fields.Str(missing="1.0")
+    force_recalculation = fields.Bool(load_default=False)
+    include_factors = fields.Bool(load_default=True)
+    model_version = fields.Str(load_default="1.0")

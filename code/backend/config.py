@@ -54,6 +54,7 @@ class Config:
     CELERY_RESULT_BACKEND = os.getenv(
         "CELERY_RESULT_BACKEND", "redis://localhost:6379/2"
     )
+    CORS_ORIGINS = os.getenv("CORS_ORIGINS", "*")
     MAX_CONTENT_LENGTH = 16 * 1024 * 1024
     UPLOAD_FOLDER = "uploads"
     ALLOWED_EXTENSIONS = {"pdf", "png", "jpg", "jpeg", "gif"}
@@ -78,6 +79,7 @@ class ProductionConfig(Config):
 
     DEBUG = False
     TESTING = False
+    CORS_ORIGINS = os.getenv("CORS_ORIGINS", "")
     SESSION_COOKIE_SECURE = True
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = "Lax"

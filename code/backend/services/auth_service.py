@@ -16,6 +16,7 @@ from typing import Any, Dict, List, Optional
 import pyotp
 import qrcode
 import redis
+from extensions import db
 from flask_bcrypt import Bcrypt
 from models.audit import AuditEventType, AuditLog, AuditSeverity
 from models.user import KYCStatus, User, UserProfile, UserSession, UserStatus
@@ -171,7 +172,7 @@ class AuthService:
     def setup_mfa(self, user_id: str) -> Dict[str, Any]:
         """Set up multi-factor authentication for user"""
         try:
-            user = User.query.get(user_id)
+            user = db.session.get(User, user_id)
             if not user:
                 raise ValueError("User not found")
             secret = pyotp.random_base32()
@@ -203,7 +204,7 @@ class AuthService:
     def enable_mfa(self, user_id: str, verification_code: str) -> bool:
         """Enable MFA after verifying the setup"""
         try:
-            user = User.query.get(user_id)
+            user = db.session.get(User, user_id)
             if not user or not user.mfa_secret:
                 return False
             if self._verify_mfa_code(user, verification_code):
@@ -220,7 +221,7 @@ class AuthService:
     ) -> bool:
         """Disable MFA with proper verification"""
         try:
-            user = User.query.get(user_id)
+            user = db.session.get(User, user_id)
             if not user:
                 return False
             if not user.check_password(password):
@@ -242,7 +243,7 @@ class AuthService:
     ) -> bool:
         """Change user password with security validations"""
         try:
-            user = User.query.get(user_id)
+            user = db.session.get(User, user_id)
             if not user:
                 return False
             if not user.check_password(current_password):
@@ -331,7 +332,7 @@ class AuthService:
     ) -> str:
         """Generate device fingerprint for session tracking"""
         fingerprint_data = (
-            f"{user_agent or ''}{ip_address or ''}{datetime.now().date()}"
+            f"{user_agent or ''}{ip_address or ''}{datetime.now(timezone.utc).date()}"
         )
         return hashlib.sha256(fingerprint_data.encode()).hexdigest()[:16]
 
@@ -361,7 +362,7 @@ class AuthService:
             return
         try:
             if session_id:
-                session = UserSession.query.get(session_id)
+                session = db.session.get(UserSession, session_id)
                 if session:
                     self.redis.delete(f"session:{session.session_token}")
             else:
@@ -401,7 +402,7 @@ class AuthService:
 
     def get_security_summary(self, user_id: str) -> Dict[str, Any]:
         """Get security summary for user"""
-        user = User.query.get(user_id)
+        user = db.session.get(User, user_id)
         if not user:
             return {}
         active_sessions = UserSession.query.filter_by(

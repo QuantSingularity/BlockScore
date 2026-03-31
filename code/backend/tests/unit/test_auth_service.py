@@ -223,7 +223,7 @@ class TestAuthenticationService:
                     sample_user.id, "old_password", "NewPassword123!"
                 )
         assert result["success"] is True
-        updated_user = User.query.get(sample_user.id)
+        updated_user = db.session.get(User, sample_user.id)
         assert updated_user.password_hash == "new_hashed_password"
 
     def test_change_password_wrong_current(
@@ -253,7 +253,7 @@ class TestAuthenticationService:
         result = auth_service.request_password_reset(sample_user.email)
         assert result["success"] is True
         assert "reset_token" in result
-        updated_user = User.query.get(sample_user.id)
+        updated_user = db.session.get(User, sample_user.id)
         assert updated_user.password_reset_token is not None
         assert updated_user.password_reset_expires is not None
 
@@ -280,7 +280,7 @@ class TestAuthenticationService:
         ):
             result = auth_service.reset_password(reset_token, "NewPassword123!")
         assert result["success"] is True
-        updated_user = User.query.get(sample_user.id)
+        updated_user = db.session.get(User, sample_user.id)
         assert updated_user.password_hash == "new_hashed_password"
         assert updated_user.password_reset_token is None
         assert updated_user.password_reset_expires is None
@@ -313,7 +313,7 @@ class TestAuthenticationService:
         assert result["success"] is True
         assert "secret" in result
         assert "qr_code" in result
-        updated_user = User.query.get(sample_user.id)
+        updated_user = db.session.get(User, sample_user.id)
         assert updated_user.mfa_secret is not None
 
     def test_verify_mfa_success(
@@ -356,7 +356,7 @@ class TestAuthenticationService:
         ):
             result = auth_service.disable_mfa(sample_user.id, "123456")
         assert result["success"] is True
-        updated_user = User.query.get(sample_user.id)
+        updated_user = db.session.get(User, sample_user.id)
         assert updated_user.mfa_enabled is False
         assert updated_user.mfa_secret is None
 
@@ -398,7 +398,7 @@ class TestAuthenticationService:
         db.session.commit()
         result = auth_service.revoke_session(sample_user.id, session.id)
         assert result["success"] is True
-        updated_session = UserSession.query.get(session.id)
+        updated_session = db.session.get(UserSession, session.id)
         assert updated_session.is_active is False
 
     def test_audit_logging(self, auth_service: Any, db: Any, sample_user: Any) -> Any:
@@ -449,6 +449,6 @@ class TestAuthenticationService:
         """Test security-related functionality"""
         with patch.object(auth_service, "_verify_password", return_value=True):
             auth_service.change_password(sample_user.id, "old_pass", "NewPass123!")
-        updated_user = User.query.get(sample_user.id)
+        updated_user = db.session.get(User, sample_user.id)
         assert updated_user.password_changed_at is not None
         assert updated_user.updated_at > sample_user.updated_at

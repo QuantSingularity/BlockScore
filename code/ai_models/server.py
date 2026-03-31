@@ -8,7 +8,7 @@ It exposes endpoints for health checks and credit score prediction.
 import logging
 import os
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict
 
 from flask import Flask, jsonify, request
@@ -34,7 +34,7 @@ def health_check() -> Any:
         {
             "status": "ok",
             "service": "BlockScore Model API",
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         }
     )
 
@@ -185,7 +185,7 @@ def batch_predict() -> Dict[str, Any]:
 
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
+    port = int(os.environ.get("PORT", 5001))
     debug = os.environ.get("FLASK_ENV") == "development"
     logger.info(f"Starting BlockScore Model API on port {port}")
     app.run(host="0.0.0.0", port=port, debug=debug)

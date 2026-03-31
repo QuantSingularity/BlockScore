@@ -10,6 +10,7 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Any, Dict, List
 
+from extensions import db
 from models.audit import ComplianceRecord, ComplianceStatus, ComplianceType
 from models.credit import CreditHistory
 from models.loan import LoanApplication
@@ -65,7 +66,7 @@ class ComplianceService:
     ) -> Dict[str, Any]:
         """Perform KYC assessment for user"""
         try:
-            user = User.query.get(user_id)
+            user = db.session.get(User, user_id)
             if not user or not user.profile:
                 raise ValueError("User or profile not found")
             profile = user.profile
@@ -95,7 +96,7 @@ class ComplianceService:
                 profile.kyc_status = kyc_status
                 profile.kyc_completed_at = (
                     datetime.now(timezone.utc)
-                    if kyc_status == KYCStatus.VERIFIED
+                    if kyc_status == KYCStatus.APPROVED
                     else None
                 )
                 self.db.session.commit()
@@ -120,7 +121,7 @@ class ComplianceService:
     ) -> Dict[str, Any]:
         """Perform AML screening for user and transactions"""
         try:
-            user = User.query.get(user_id)
+            user = db.session.get(User, user_id)
             if not user:
                 raise ValueError("User not found")
             screening_results = {
@@ -162,7 +163,7 @@ class ComplianceService:
     def assess_loan_compliance(self, loan_application_id: str) -> Dict[str, Any]:
         """Assess loan application for regulatory compliance"""
         try:
-            loan_app = LoanApplication.query.get(loan_application_id)
+            loan_app = db.session.get(LoanApplication, loan_application_id)
             if not loan_app:
                 raise ValueError("Loan application not found")
             compliance_checks = {
@@ -385,9 +386,9 @@ class ComplianceService:
     ) -> KYCStatus:
         """Determine KYC status based on compliance score and results"""
         if compliance_score >= 90:
-            return KYCStatus.VERIFIED
+            return KYCStatus.APPROVED
         elif compliance_score >= 70:
-            return KYCStatus.PENDING
+            return KYCStatus.PENDING_REVIEW
         elif compliance_score >= 50:
             return KYCStatus.IN_PROGRESS
         else:

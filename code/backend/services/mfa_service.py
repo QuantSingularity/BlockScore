@@ -15,6 +15,7 @@ from typing import Any, Dict, List, Optional
 import pyotp
 import qrcode
 import requests
+from extensions import db
 from flask import current_app
 from models.audit import AuditEventType, AuditSeverity
 from models.user import User, UserProfile
@@ -53,7 +54,7 @@ class MFAService:
     def setup_totp(self, user_id: int) -> Dict[str, Any]:
         """Set up TOTP (Time-based One-Time Password) for user"""
         try:
-            user = User.query.get(user_id)
+            user = db.session.get(User, user_id)
             if not user:
                 raise ValueError("User not found")
             secret = pyotp.random_base32()
@@ -89,7 +90,7 @@ class MFAService:
     def verify_totp_setup(self, user_id: int, verification_code: str) -> Dict[str, Any]:
         """Verify TOTP setup and enable MFA"""
         try:
-            user = User.query.get(user_id)
+            user = db.session.get(User, user_id)
             if not user or not user.profile or (not user.profile.totp_secret):
                 raise ValueError("TOTP not set up for user")
             secret = self._decrypt_secret(user.profile.totp_secret)
@@ -130,7 +131,7 @@ class MFAService:
     def setup_sms_mfa(self, user_id: int, phone_number: str) -> Dict[str, Any]:
         """Set up SMS-based MFA"""
         try:
-            user = User.query.get(user_id)
+            user = db.session.get(User, user_id)
             if not user:
                 raise ValueError("User not found")
             if not self._validate_phone_number(phone_number):
@@ -175,7 +176,7 @@ class MFAService:
     def verify_sms_setup(self, user_id: int, verification_code: str) -> Dict[str, Any]:
         """Verify SMS setup and enable SMS MFA"""
         try:
-            user = User.query.get(user_id)
+            user = db.session.get(User, user_id)
             if not user or not user.profile:
                 raise ValueError("User or profile not found")
             if (
@@ -226,7 +227,7 @@ class MFAService:
     ) -> Dict[str, Any]:
         """Verify MFA code during authentication"""
         try:
-            user = User.query.get(user_id)
+            user = db.session.get(User, user_id)
             if not user or not user.profile:
                 raise ValueError("User or profile not found")
             if not user.profile.mfa_enabled:
@@ -276,7 +277,7 @@ class MFAService:
     def send_sms_code(self, user_id: int) -> Dict[str, Any]:
         """Send SMS verification code for authentication"""
         try:
-            user = User.query.get(user_id)
+            user = db.session.get(User, user_id)
             if not user or not user.profile:
                 raise ValueError("User or profile not found")
             if MFAMethod.SMS not in (user.profile.mfa_methods or []):
@@ -311,7 +312,7 @@ class MFAService:
     def disable_mfa(self, user_id: int, method: Optional[str] = None) -> Dict[str, Any]:
         """Disable MFA for user (specific method or all)"""
         try:
-            user = User.query.get(user_id)
+            user = db.session.get(User, user_id)
             if not user or not user.profile:
                 raise ValueError("User or profile not found")
             if method:
@@ -358,7 +359,7 @@ class MFAService:
     def get_mfa_status(self, user_id: int) -> Dict[str, Any]:
         """Get MFA status and available methods for user"""
         try:
-            user = User.query.get(user_id)
+            user = db.session.get(User, user_id)
             if not user or not user.profile:
                 return {
                     "mfa_enabled": False,
@@ -395,7 +396,7 @@ class MFAService:
     def regenerate_backup_codes(self, user_id: int) -> Dict[str, Any]:
         """Regenerate backup codes for user"""
         try:
-            user = User.query.get(user_id)
+            user = db.session.get(User, user_id)
             if not user or not user.profile or (not user.profile.mfa_enabled):
                 raise ValueError("MFA not enabled for user")
             backup_codes = self._generate_backup_codes(user_id)
@@ -454,7 +455,7 @@ class MFAService:
         for _ in range(self.backup_codes_count):
             code = "".join([str(secrets.randbelow(10)) for _ in range(8)])
             codes.append(f"{code[:4]}-{code[4:]}")
-        user = User.query.get(user_id)
+        user = db.session.get(User, user_id)
         user.profile.backup_codes = self._encrypt_secret(",".join(codes))
         self.db.commit()
         return codes
@@ -500,7 +501,7 @@ class MFAService:
     def _verify_totp_code(self, user_id: int, code: str) -> bool:
         """Verify TOTP code"""
         try:
-            user = User.query.get(user_id)
+            user = db.session.get(User, user_id)
             if not user.profile.totp_secret:
                 return False
             secret = self._decrypt_secret(user.profile.totp_secret)
@@ -513,7 +514,7 @@ class MFAService:
     def _verify_sms_code(self, user_id: int, code: str) -> bool:
         """Verify SMS code"""
         try:
-            user = User.query.get(user_id)
+            user = db.session.get(User, user_id)
             if (
                 not user.profile.sms_verification_code
                 or not user.profile.sms_code_expires_at
@@ -530,7 +531,7 @@ class MFAService:
     def _verify_backup_code(self, user_id: int, code: str) -> bool:
         """Verify and consume backup code"""
         try:
-            user = User.query.get(user_id)
+            user = db.session.get(User, user_id)
             if not user.profile.backup_codes:
                 return False
             backup_codes = self._decrypt_secret(user.profile.backup_codes)
@@ -548,7 +549,7 @@ class MFAService:
     def _is_mfa_locked(self, user_id: int) -> bool:
         """Check if user is locked due to failed MFA attempts"""
         try:
-            user = User.query.get(user_id)
+            user = db.session.get(User, user_id)
             if not user or not user.profile:
                 return False
             if (
@@ -567,7 +568,7 @@ class MFAService:
     def _increment_mfa_failed_attempts(self, user_id: int) -> Any:
         """Increment failed MFA attempts counter and lock if threshold exceeded"""
         try:
-            user = User.query.get(user_id)
+            user = db.session.get(User, user_id)
             if not user or not user.profile:
                 return
             if not hasattr(user.profile, "mfa_failed_attempts"):
@@ -590,7 +591,7 @@ class MFAService:
     def _reset_mfa_failed_attempts(self, user_id: int) -> Any:
         """Reset failed MFA attempts counter after successful verification"""
         try:
-            user = User.query.get(user_id)
+            user = db.session.get(User, user_id)
             if not user or not user.profile:
                 return
             user.profile.mfa_failed_attempts = 0
@@ -605,7 +606,7 @@ class MFAService:
     def _is_sms_rate_limited(self, user_id: int) -> bool:
         """Check if SMS sending is rate limited for user"""
         try:
-            user = User.query.get(user_id)
+            user = db.session.get(User, user_id)
             if not user or not user.profile:
                 return False
             if (
@@ -636,7 +637,7 @@ class MFAService:
     def _update_sms_rate_limit(self, user_id: int) -> Any:
         """Update SMS rate limiting counter"""
         try:
-            user = User.query.get(user_id)
+            user = db.session.get(User, user_id)
             if not user or not user.profile:
                 return
             today_start = datetime.now(timezone.utc).replace(

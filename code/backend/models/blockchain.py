@@ -8,10 +8,8 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, List
 
-from flask_sqlalchemy import SQLAlchemy
+from extensions import db
 from marshmallow import Schema, fields, validate
-
-db = SQLAlchemy()
 
 
 class TransactionStatus(enum.Enum):
@@ -403,8 +401,8 @@ class TransactionSubmissionSchema(Schema):
     to_address = fields.Str(validate=validate.Length(equal=42), allow_none=True)
     contract_address = fields.Str(validate=validate.Length(equal=42), allow_none=True)
     function_name = fields.Str(allow_none=True)
-    function_params = fields.Dict(missing={})
-    value = fields.Decimal(places=8, missing=0)
+    function_params = fields.Dict(load_default={})
+    value = fields.Decimal(places=8, load_default=0)
     gas_limit = fields.Int(validate=validate.Range(min=21000), allow_none=True)
     gas_price = fields.Int(validate=validate.Range(min=1), allow_none=True)
 
@@ -416,10 +414,10 @@ class ContractDeploymentSchema(Schema):
     contract_type = fields.Str(
         required=True, validate=validate.OneOf([e.value for e in ContractType])
     )
-    contract_version = fields.Str(missing="1.0.0")
+    contract_version = fields.Str(load_default="1.0.0")
     bytecode = fields.Str(required=True)
     abi = fields.List(fields.Dict(), required=True)
-    constructor_args = fields.List(fields.Raw(), missing=[])
+    constructor_args = fields.List(fields.Raw(), load_default=[])
     description = fields.Str(allow_none=True)
     documentation_url = fields.Str(allow_none=True)
     source_code_url = fields.Str(allow_none=True)
