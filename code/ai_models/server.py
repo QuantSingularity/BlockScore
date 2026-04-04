@@ -11,8 +11,9 @@ import sys
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 import logging
-from typing import Any, Dict
 from datetime import datetime, timezone
+from typing import Any, Dict
+
 from flask import Flask, jsonify, request
 from model_integration import (
     calculate_score_factors,
