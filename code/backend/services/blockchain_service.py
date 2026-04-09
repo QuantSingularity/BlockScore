@@ -19,8 +19,16 @@ from models.blockchain import (
     TransactionStatus,
     TransactionType,
 )
-from web3 import Web3
-from web3.exceptions import TransactionNotFound
+
+try:
+    from web3 import Web3
+    from web3.exceptions import TransactionNotFound
+
+    _WEB3_AVAILABLE = True
+except ImportError:
+    Web3 = None
+    TransactionNotFound = Exception
+    _WEB3_AVAILABLE = False
 
 
 class BlockchainService:
@@ -43,7 +51,9 @@ class BlockchainService:
             ),
         }
         self.default_gas_limit = 200000
-        self.default_gas_price = Web3.to_wei(20, "gwei")
+        self.default_gas_price = (
+            Web3.to_wei(20, "gwei") if _WEB3_AVAILABLE and Web3 else 20000000000
+        )
         self.confirmation_blocks = 12
         self.transaction_timeout = 300
         self.network_id = config.get("BLOCKCHAIN_NETWORK_ID", 1)
@@ -473,6 +483,9 @@ class BlockchainService:
 
     def _initialize_web3(self) -> Any:
         """Initialize Web3 connection"""
+        if not _WEB3_AVAILABLE:
+            self.logger.warning("web3 not installed; blockchain features disabled")
+            return
         try:
             provider_url = self.config.get("BLOCKCHAIN_PROVIDER_URL")
             if not provider_url:

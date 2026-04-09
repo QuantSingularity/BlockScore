@@ -12,8 +12,6 @@ from marshmallow import Schema, ValidationError, fields, validate, validates_sch
 
 
 class UserStatus(enum.Enum):
-    """User account status enumeration"""
-
     PENDING = "pending"
     ACTIVE = "active"
     SUSPENDED = "suspended"
@@ -22,8 +20,6 @@ class UserStatus(enum.Enum):
 
 
 class KYCStatus(enum.Enum):
-    """KYC verification status enumeration"""
-
     NOT_STARTED = "not_started"
     IN_PROGRESS = "in_progress"
     PENDING_REVIEW = "pending_review"
@@ -33,33 +29,34 @@ class KYCStatus(enum.Enum):
 
 
 class User(db.Model):
-    """User model for authentication and basic information"""
-
     __tablename__ = "users"
     id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     email = db.Column(db.String(255), unique=True, nullable=False, index=True)
-    password_hash = db.Column(db.String(128), nullable=False)
+    password_hash = db.Column(db.String(255), nullable=False)
     status = db.Column(db.Enum(UserStatus), default=UserStatus.PENDING, nullable=False)
+    is_active = db.Column(db.Boolean, default=True)
+    email_verified = db.Column(db.Boolean, default=False)
     failed_login_attempts = db.Column(db.Integer, default=0)
     locked_until = db.Column(db.DateTime(timezone=True), nullable=True)
     last_login = db.Column(db.DateTime(timezone=True), nullable=True)
     password_changed_at = db.Column(
-        db.DateTime(timezone=True), default=datetime.now(timezone.utc)
+        db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
+    password_reset_token = db.Column(db.String(255), nullable=True, index=True)
+    password_reset_expires = db.Column(db.DateTime(timezone=True), nullable=True)
     mfa_enabled = db.Column(db.Boolean, default=False)
-    mfa_secret = db.Column(db.String(32), nullable=True)
+    mfa_secret = db.Column(db.String(64), nullable=True)
     backup_codes = db.Column(db.Text, nullable=True)
-    # MFA-related fields
     totp_secret = db.Column(db.String(255), nullable=True)
     sms_verification_code = db.Column(db.String(255), nullable=True)
     mfa_methods = db.Column(db.Text, nullable=True)
     created_at = db.Column(
-        db.DateTime(timezone=True), default=datetime.now(timezone.utc)
+        db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
     updated_at = db.Column(
         db.DateTime(timezone=True),
-        default=datetime.now(timezone.utc),
-        onupdate=datetime.now(timezone.utc),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
     )
     profile = db.relationship(
         "UserProfile", backref="user", uselist=False, cascade="all, delete-orphan"
@@ -69,38 +66,40 @@ class User(db.Model):
     )
 
     def set_password(self, password: Any) -> None:
-        """Set password hash"""
         self.password_hash = bcrypt.generate_password_hash(password).decode("utf-8")
         self.password_changed_at = datetime.now(timezone.utc)
+        self.updated_at = datetime.now(timezone.utc)
 
     def check_password(self, password: Any) -> bool:
-        """Check password against hash"""
-        return bcrypt.check_password_hash(self.password_hash, password)
+        try:
+            return bcrypt.check_password_hash(self.password_hash, password)
+        except Exception:
+            return False
 
     def is_locked(self) -> bool:
-        """Check if account is locked"""
         if self.locked_until:
-            return datetime.now(timezone.utc) < self.locked_until
+            locked_until = self.locked_until
+            if locked_until.tzinfo is None:
+                locked_until = locked_until.replace(tzinfo=timezone.utc)
+            return datetime.now(timezone.utc) < locked_until
         return False
 
     def lock_account(self, duration_minutes: Any = 30) -> None:
-        """Lock account for specified duration"""
         self.locked_until = datetime.now(timezone.utc) + timedelta(
             minutes=duration_minutes
         )
-        self.failed_login_attempts += 1
 
     def unlock_account(self) -> None:
-        """Unlock account and reset failed attempts"""
         self.locked_until = None
         self.failed_login_attempts = 0
 
     def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary for JSON serialization"""
         return {
             "id": self.id,
             "email": self.email,
             "status": self.status.value,
+            "is_active": self.is_active,
+            "email_verified": self.email_verified,
             "mfa_enabled": self.mfa_enabled,
             "last_login": self.last_login.isoformat() if self.last_login else None,
             "created_at": self.created_at.isoformat(),
@@ -109,8 +108,6 @@ class User(db.Model):
 
 
 class UserProfile(db.Model):
-    """Extended user profile information"""
-
     __tablename__ = "user_profiles"
     id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     user_id = db.Column(db.String(36), db.ForeignKey("users.id"), nullable=False)
@@ -119,6 +116,8 @@ class UserProfile(db.Model):
     date_of_birth = db.Column(db.Date, nullable=True)
     phone_number = db.Column(db.String(20), nullable=True)
     street_address = db.Column(db.String(255), nullable=True)
+    address_line1 = db.Column(db.String(255), nullable=True)
+    address_line2 = db.Column(db.String(255), nullable=True)
     city = db.Column(db.String(100), nullable=True)
     state = db.Column(db.String(100), nullable=True)
     postal_code = db.Column(db.String(20), nullable=True)
@@ -126,34 +125,28 @@ class UserProfile(db.Model):
     kyc_status = db.Column(db.Enum(KYCStatus), default=KYCStatus.NOT_STARTED)
     kyc_completed_at = db.Column(db.DateTime(timezone=True), nullable=True)
     kyc_documents = db.Column(db.Text, nullable=True)
-    annual_income = db.Column(db.Decimal(15, 2), nullable=True)
+    annual_income = db.Column(db.Numeric(15, 2), nullable=True)
     employment_status = db.Column(db.String(50), nullable=True)
     employer_name = db.Column(db.String(255), nullable=True)
     wallet_address = db.Column(db.String(42), nullable=True, index=True)
     wallet_verified = db.Column(db.Boolean, default=False)
     data_sharing_consent = db.Column(db.Boolean, default=False)
     marketing_consent = db.Column(db.Boolean, default=False)
-    # MFA-related fields
-    totp_secret = db.Column(db.String(255), nullable=True)
-    sms_verification_code = db.Column(db.String(255), nullable=True)
-    mfa_methods = db.Column(db.Text, nullable=True)
     created_at = db.Column(
-        db.DateTime(timezone=True), default=datetime.now(timezone.utc)
+        db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
     updated_at = db.Column(
         db.DateTime(timezone=True),
-        default=datetime.now(timezone.utc),
-        onupdate=datetime.now(timezone.utc),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
     )
 
     def get_full_name(self) -> str:
-        """Get full name"""
         if self.first_name and self.last_name:
             return f"{self.first_name} {self.last_name}"
         return self.first_name or self.last_name or "Unknown"
 
     def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary for JSON serialization"""
         return {
             "id": self.id,
             "user_id": self.user_id,
@@ -165,7 +158,8 @@ class UserProfile(db.Model):
             ),
             "phone_number": self.phone_number,
             "address": {
-                "street_address": self.street_address,
+                "street_address": self.street_address or self.address_line1,
+                "address_line2": self.address_line2,
                 "city": self.city,
                 "state": self.state,
                 "postal_code": self.postal_code,
@@ -186,13 +180,11 @@ class UserProfile(db.Model):
 
 
 class UserSession(db.Model):
-    """User session tracking for security"""
-
     __tablename__ = "user_sessions"
     id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     user_id = db.Column(db.String(36), db.ForeignKey("users.id"), nullable=False)
-    session_token = db.Column(db.String(255), unique=True, nullable=False, index=True)
-    refresh_token = db.Column(db.String(255), unique=True, nullable=True, index=True)
+    session_token = db.Column(db.String(512), unique=True, nullable=False, index=True)
+    refresh_token = db.Column(db.String(512), unique=True, nullable=True, index=True)
     device_fingerprint = db.Column(db.String(255), nullable=True)
     ip_address = db.Column(db.String(45), nullable=True)
     user_agent = db.Column(db.Text, nullable=True)
@@ -200,22 +192,22 @@ class UserSession(db.Model):
     is_active = db.Column(db.Boolean, default=True)
     expires_at = db.Column(db.DateTime(timezone=True), nullable=False)
     last_activity = db.Column(
-        db.DateTime(timezone=True), default=datetime.now(timezone.utc)
+        db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
     created_at = db.Column(
-        db.DateTime(timezone=True), default=datetime.now(timezone.utc)
+        db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
 
     def is_expired(self) -> bool:
-        """Check if session is expired"""
-        return datetime.now(timezone.utc) > self.expires_at
+        expires = self.expires_at
+        if expires.tzinfo is None:
+            expires = expires.replace(tzinfo=timezone.utc)
+        return datetime.now(timezone.utc) > expires
 
     def revoke(self) -> None:
-        """Revoke session"""
         self.is_active = False
 
     def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary for JSON serialization"""
         return {
             "id": self.id,
             "device_fingerprint": self.device_fingerprint,
@@ -229,8 +221,6 @@ class UserSession(db.Model):
 
 
 class UserRegistrationSchema(Schema):
-    """Schema for user registration"""
-
     email = fields.Email(required=True, validate=validate.Length(max=255))
     password = fields.Str(required=True, validate=validate.Length(min=8, max=128))
     confirm_password = fields.Str(required=True)
@@ -244,8 +234,6 @@ class UserRegistrationSchema(Schema):
 
 
 class UserLoginSchema(Schema):
-    """Schema for user login"""
-
     email = fields.Email(required=True)
     password = fields.Str(required=True)
     remember_me = fields.Bool(load_default=False)
@@ -253,8 +241,6 @@ class UserLoginSchema(Schema):
 
 
 class UserProfileSchema(Schema):
-    """Schema for user profile"""
-
     first_name = fields.Str(validate=validate.Length(max=100), allow_none=True)
     last_name = fields.Str(validate=validate.Length(max=100), allow_none=True)
     date_of_birth = fields.Date(allow_none=True)
@@ -271,11 +257,11 @@ class UserProfileSchema(Schema):
 
 
 class UserSchema(Schema):
-    """Schema for user serialization"""
-
     id = fields.Str(dump_only=True)
     email = fields.Email(dump_only=True)
     status = fields.Str(dump_only=True)
+    is_active = fields.Bool(dump_only=True)
+    email_verified = fields.Bool(dump_only=True)
     mfa_enabled = fields.Bool(dump_only=True)
     last_login = fields.DateTime(dump_only=True)
     created_at = fields.DateTime(dump_only=True)

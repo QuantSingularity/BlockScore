@@ -8,8 +8,20 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
-from celery import Celery, Task
-from celery.result import AsyncResult
+try:
+    from celery import Celery, Task
+    from celery.result import AsyncResult
+
+    _CELERY_AVAILABLE = True
+except ImportError:
+    Celery = None
+    Task = object
+    AsyncResult = None
+    _CELERY_AVAILABLE = False
+
+
+# Module-level Celery instance used by all task decorators
+celery_app = Celery("blockscore_jobs") if _CELERY_AVAILABLE else None
 
 
 class JobManager:
@@ -21,9 +33,11 @@ class JobManager:
         self.celery = self._create_celery_app()
         self.job_registry = {}
 
-    def _create_celery_app(self) -> Celery:
+    def _create_celery_app(self) -> Any:
         """Create and configure Celery application"""
-        celery_app = Celery("blockscore_jobs")
+        if not _CELERY_AVAILABLE:
+            self.logger.warning("Celery not installed; background jobs disabled")
+            return None
         celery_config = {
             "broker_url": self.config.get(
                 "CELERY_BROKER_URL", "redis://localhost:6379/0"
@@ -301,195 +315,236 @@ class BaseTask(Task):
         logging.warning(f"Task {task_id} retrying due to: {exc}")
 
 
-@Celery.task(
-    bind=True, base=BaseTask, name="blockscore_jobs.credit_scoring.calculate_score"
-)
-def calculate_credit_score_async(
-    self, user_id: str, wallet_address: Optional[str] = None
-) -> Any:
-    """Asynchronous credit score calculation"""
-    try:
-        from models import db
-        from services.credit_service import CreditScoringService
+if celery_app is not None:
 
-        credit_service = CreditScoringService(db)
-        result = credit_service.calculate_credit_score(
-            user_id, wallet_address, force_recalculation=True
-        )
-        return {
-            "user_id": user_id,
-            "credit_score": result.get("score"),
-            "calculated_at": datetime.now(timezone.utc).isoformat(),
-        }
-    except Exception as exc:
-        self.retry(exc=exc, countdown=60, max_retries=3)
-
-
-@Celery.task(
-    bind=True, base=BaseTask, name="blockscore_jobs.credit_scoring.batch_calculate"
-)
-def batch_calculate_credit_scores(self, user_ids: List[str]) -> Any:
-    """Batch credit score calculation"""
-    results = []
-    for user_id in user_ids:
+    @celery_app.task(
+        bind=True, base=BaseTask, name="blockscore_jobs.credit_scoring.calculate_score"
+    )
+    def calculate_credit_score_async(
+        self, user_id: str, wallet_address: Optional[str] = None
+    ) -> Any:
+        """Asynchronous credit score calculation"""
         try:
-            result = calculate_credit_score_async.delay(user_id)
-            results.append({"user_id": user_id, "job_id": result.id})
-        except Exception as e:
-            results.append({"user_id": user_id, "error": str(e)})
-    return results
+            from models import db
+            from services.credit_service import CreditScoringService
 
+            credit_service = CreditScoringService(db)
+            result = credit_service.calculate_credit_score(
+                user_id, wallet_address, force_recalculation=True
+            )
+            return {
+                "user_id": user_id,
+                "credit_score": result.get("score"),
+                "calculated_at": datetime.now(timezone.utc).isoformat(),
+            }
+        except Exception as exc:
+            self.retry(exc=exc, countdown=60, max_retries=3)
 
-@Celery.task(
-    bind=True,
-    base=BaseTask,
-    name="blockscore_jobs.blockchain.update_pending_transactions",
-)
-def update_pending_transactions(self) -> Any:
-    """Update pending blockchain transactions"""
-    try:
-        from services.blockchain_service import BlockchainService
+    @celery_app.task(
+        bind=True, base=BaseTask, name="blockscore_jobs.credit_scoring.batch_calculate"
+    )
+    def batch_calculate_credit_scores(self, user_ids: List[str]) -> Any:
+        """Batch credit score calculation"""
+        results = []
+        for user_id in user_ids:
+            try:
+                result = calculate_credit_score_async.delay(user_id)
+                results.append({"user_id": user_id, "job_id": result.id})
+            except Exception as e:
+                results.append({"user_id": user_id, "error": str(e)})
+        return results
 
-        blockchain_service = BlockchainService({})
-        result = blockchain_service.monitor_pending_transactions()
-        return result
-    except Exception as exc:
-        self.retry(exc=exc, countdown=120, max_retries=5)
+    @celery_app.task(
+        bind=True,
+        base=BaseTask,
+        name="blockscore_jobs.blockchain.update_pending_transactions",
+    )
+    def update_pending_transactions(self) -> Any:
+        """Update pending blockchain transactions"""
+        try:
+            from services.blockchain_service import BlockchainService
 
+            blockchain_service = BlockchainService({})
+            result = blockchain_service.monitor_pending_transactions()
+            return result
+        except Exception as exc:
+            self.retry(exc=exc, countdown=120, max_retries=5)
 
-@Celery.task(
-    bind=True, base=BaseTask, name="blockscore_jobs.blockchain.submit_transaction"
-)
-def submit_blockchain_transaction(
-    self, transaction_type: str, transaction_data: Dict[str, Any]
-) -> Any:
-    """Submit blockchain transaction"""
-    try:
-        from services.blockchain_service import BlockchainService
+    @celery_app.task(
+        bind=True, base=BaseTask, name="blockscore_jobs.blockchain.submit_transaction"
+    )
+    def submit_blockchain_transaction(
+        self, transaction_type: str, transaction_data: Dict[str, Any]
+    ) -> Any:
+        """Submit blockchain transaction"""
+        try:
+            from services.blockchain_service import BlockchainService
 
-        blockchain_service = BlockchainService({})
-        if transaction_type == "credit_score_update":
-            result = blockchain_service.submit_credit_score_update(**transaction_data)
-        elif transaction_type == "loan_agreement":
-            result = blockchain_service.submit_loan_agreement(**transaction_data)
-        elif transaction_type == "payment_record":
-            result = blockchain_service.record_payment(**transaction_data)
-        else:
-            raise ValueError(f"Unknown transaction type: {transaction_type}")
-        return result
-    except Exception as exc:
-        self.retry(exc=exc, countdown=180, max_retries=3)
+            blockchain_service = BlockchainService({})
+            if transaction_type == "credit_score_update":
+                result = blockchain_service.submit_credit_score_update(
+                    **transaction_data
+                )
+            elif transaction_type == "loan_agreement":
+                result = blockchain_service.submit_loan_agreement(**transaction_data)
+            elif transaction_type == "payment_record":
+                result = blockchain_service.record_payment(**transaction_data)
+            else:
+                raise ValueError(f"Unknown transaction type: {transaction_type}")
+            return result
+        except Exception as exc:
+            self.retry(exc=exc, countdown=180, max_retries=3)
 
+    @celery_app.task(
+        bind=True, base=BaseTask, name="blockscore_jobs.compliance.kyc_assessment"
+    )
+    def perform_kyc_assessment(self, user_id: str, kyc_level: str = "basic") -> Any:
+        """Perform KYC assessment"""
+        try:
+            from models import db
+            from services.compliance_service import ComplianceService
 
-@Celery.task(bind=True, base=BaseTask, name="blockscore_jobs.compliance.kyc_assessment")
-def perform_kyc_assessment(self, user_id: str, kyc_level: str = "basic") -> Any:
-    """Perform KYC assessment"""
-    try:
-        from models import db
-        from services.compliance_service import ComplianceService
+            compliance_service = ComplianceService(db)
+            result = compliance_service.perform_kyc_assessment(user_id, kyc_level)
+            return result
+        except Exception as exc:
+            self.retry(exc=exc, countdown=60, max_retries=3)
 
-        compliance_service = ComplianceService(db)
-        result = compliance_service.perform_kyc_assessment(user_id, kyc_level)
-        return result
-    except Exception as exc:
-        self.retry(exc=exc, countdown=60, max_retries=3)
+    @celery_app.task(
+        bind=True, base=BaseTask, name="blockscore_jobs.compliance.aml_screening"
+    )
+    def perform_aml_screening(
+        self, user_id: str, transaction_data: Dict[str, Any] = None
+    ) -> Any:
+        """Perform AML screening"""
+        try:
+            from models import db
+            from services.compliance_service import ComplianceService
 
+            compliance_service = ComplianceService(db)
+            result = compliance_service.perform_aml_screening(user_id, transaction_data)
+            return result
+        except Exception as exc:
+            self.retry(exc=exc, countdown=60, max_retries=3)
 
-@Celery.task(bind=True, base=BaseTask, name="blockscore_jobs.compliance.aml_screening")
-def perform_aml_screening(
-    self, user_id: str, transaction_data: Dict[str, Any] = None
-) -> Any:
-    """Perform AML screening"""
-    try:
-        from models import db
-        from services.compliance_service import ComplianceService
+    @celery_app.task(
+        bind=True,
+        base=BaseTask,
+        name="blockscore_jobs.compliance.generate_daily_reports",
+    )
+    def generate_daily_compliance_reports(self) -> Any:
+        """Generate daily compliance reports"""
+        try:
+            from models import db
+            from services.compliance_service import ComplianceService
 
-        compliance_service = ComplianceService(db)
-        result = compliance_service.perform_aml_screening(user_id, transaction_data)
-        return result
-    except Exception as exc:
-        self.retry(exc=exc, countdown=60, max_retries=3)
+            compliance_service = ComplianceService(db)
+            end_date = datetime.now(timezone.utc).replace(
+                hour=0, minute=0, second=0, microsecond=0
+            )
+            start_date = end_date - timedelta(days=1)
+            report = compliance_service.generate_compliance_report(
+                start_date, end_date
+            )
+            return {
+                "report_date": start_date.date().isoformat(),
+                "summary": report.get("summary", {}),
+                "generated_at": datetime.now(timezone.utc).isoformat(),
+            }
+        except Exception as exc:
+            self.retry(exc=exc, countdown=300, max_retries=2)
 
+    @celery_app.task(
+        bind=True,
+        base=BaseTask,
+        name="blockscore_jobs.maintenance.cleanup_expired_sessions",
+    )
+    def cleanup_expired_sessions(self) -> Any:
+        """Clean up expired user sessions"""
+        try:
+            from models import db
+            from models.user import UserSession
 
-@Celery.task(
-    bind=True, base=BaseTask, name="blockscore_jobs.compliance.generate_daily_reports"
-)
-def generate_daily_compliance_reports(self) -> Any:
-    """Generate daily compliance reports"""
-    try:
-        from models import db
-        from services.compliance_service import ComplianceService
+            cutoff_time = datetime.now(timezone.utc)
+            expired_sessions = UserSession.query.filter(
+                UserSession.expires_at < cutoff_time
+            ).all()
+            count = len(expired_sessions)
+            for session in expired_sessions:
+                db.session.delete(session)
+            db.session.commit()
+            return {
+                "cleaned_sessions": count,
+                "cleaned_at": datetime.now(timezone.utc).isoformat(),
+            }
+        except Exception as exc:
+            self.retry(exc=exc, countdown=300, max_retries=2)
 
-        compliance_service = ComplianceService(db)
-        end_date = datetime.now(timezone.utc).replace(
-            hour=0, minute=0, second=0, microsecond=0
+    @celery_app.task(
+        bind=True, base=BaseTask, name="blockscore_jobs.maintenance.system_health_check"
+    )
+    def system_health_check(self) -> Any:
+        """Perform system health check"""
+        try:
+            from models import db
+            from utils.database import DatabaseOptimizer
+
+            db_optimizer = DatabaseOptimizer(db, db.engine)
+            db_health = db_optimizer.get_database_health()
+            cache_health = {"available": False}
+            blockchain_health = {"connected": False}
+            health_report = {
+                "database": db_health,
+                "cache": cache_health,
+                "blockchain": blockchain_health,
+                "checked_at": datetime.now(timezone.utc).isoformat(),
+            }
+            if db_health.get("connection_status") != "connected":
+                logging.critical("Database connection issue detected")
+            return health_report
+        except Exception as exc:
+            logging.error(f"Health check failed: {exc}")
+            self.retry(exc=exc, countdown=60, max_retries=2)
+
+    @celery_app.task(bind=True, base=BaseTask, name="blockscore_jobs.test.ping")
+    def ping_task(self) -> Any:
+        """Simple ping task for testing"""
+        return {"message": "pong", "timestamp": datetime.now(timezone.utc).isoformat()}
+
+else:
+    # Celery unavailable: define no-op stubs so imports don't fail
+    def calculate_credit_score_async(*args: Any, **kwargs: Any) -> None:
+        logging.warning("Celery unavailable; calculate_credit_score_async is a no-op")
+
+    def batch_calculate_credit_scores(*args: Any, **kwargs: Any) -> None:
+        logging.warning(
+            "Celery unavailable; batch_calculate_credit_scores is a no-op"
         )
-        start_date = end_date - timedelta(days=1)
-        report = compliance_service.generate_compliance_report(start_date, end_date)
-        return {
-            "report_date": start_date.date().isoformat(),
-            "summary": report.get("summary", {}),
-            "generated_at": datetime.now(timezone.utc).isoformat(),
-        }
-    except Exception as exc:
-        self.retry(exc=exc, countdown=300, max_retries=2)
 
+    def update_pending_transactions(*args: Any, **kwargs: Any) -> None:
+        logging.warning("Celery unavailable; update_pending_transactions is a no-op")
 
-@Celery.task(
-    bind=True,
-    base=BaseTask,
-    name="blockscore_jobs.maintenance.cleanup_expired_sessions",
-)
-def cleanup_expired_sessions(self) -> Any:
-    """Clean up expired user sessions"""
-    try:
-        from models import db
-        from models.user import UserSession
+    def submit_blockchain_transaction(*args: Any, **kwargs: Any) -> None:
+        logging.warning(
+            "Celery unavailable; submit_blockchain_transaction is a no-op"
+        )
 
-        cutoff_time = datetime.now(timezone.utc)
-        expired_sessions = UserSession.query.filter(
-            UserSession.expires_at < cutoff_time
-        ).all()
-        count = len(expired_sessions)
-        for session in expired_sessions:
-            db.session.delete(session)
-        db.session.commit()
-        return {
-            "cleaned_sessions": count,
-            "cleaned_at": datetime.now(timezone.utc).isoformat(),
-        }
-    except Exception as exc:
-        self.retry(exc=exc, countdown=300, max_retries=2)
+    def perform_kyc_assessment(*args: Any, **kwargs: Any) -> None:
+        logging.warning("Celery unavailable; perform_kyc_assessment is a no-op")
 
+    def perform_aml_screening(*args: Any, **kwargs: Any) -> None:
+        logging.warning("Celery unavailable; perform_aml_screening is a no-op")
 
-@Celery.task(
-    bind=True, base=BaseTask, name="blockscore_jobs.maintenance.system_health_check"
-)
-def system_health_check(self) -> Any:
-    """Perform system health check"""
-    try:
-        from models import db
-        from utils.database import DatabaseOptimizer
+    def generate_daily_compliance_reports(*args: Any, **kwargs: Any) -> None:
+        logging.warning(
+            "Celery unavailable; generate_daily_compliance_reports is a no-op"
+        )
 
-        db_optimizer = DatabaseOptimizer(db, db.engine)
-        db_health = db_optimizer.get_database_health()
-        cache_health = {"available": False}
-        blockchain_health = {"connected": False}
-        health_report = {
-            "database": db_health,
-            "cache": cache_health,
-            "blockchain": blockchain_health,
-            "checked_at": datetime.now(timezone.utc).isoformat(),
-        }
-        if db_health.get("connection_status") != "connected":
-            logging.critical("Database connection issue detected")
-        return health_report
-    except Exception as exc:
-        logging.error(f"Health check failed: {exc}")
-        self.retry(exc=exc, countdown=60, max_retries=2)
+    def cleanup_expired_sessions(*args: Any, **kwargs: Any) -> None:
+        logging.warning("Celery unavailable; cleanup_expired_sessions is a no-op")
 
+    def system_health_check(*args: Any, **kwargs: Any) -> None:
+        logging.warning("Celery unavailable; system_health_check is a no-op")
 
-@Celery.task(bind=True, base=BaseTask, name="blockscore_jobs.test.ping")
-def ping_task(self) -> Any:
-    """Simple ping task for testing"""
-    return {"message": "pong", "timestamp": datetime.now(timezone.utc).isoformat()}
+    def ping_task(*args: Any, **kwargs: Any) -> None:
+        logging.warning("Celery unavailable; ping_task is a no-op")

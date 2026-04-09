@@ -74,8 +74,8 @@ class BlockchainTransaction(db.Model):
     gas_limit = db.Column(db.BigInteger, nullable=True)
     gas_used = db.Column(db.BigInteger, nullable=True)
     gas_price = db.Column(db.BigInteger, nullable=True)
-    transaction_fee = db.Column(db.Decimal(20, 8), nullable=True)
-    value = db.Column(db.Decimal(20, 8), nullable=True)
+    transaction_fee = db.Column(db.Numeric(20, 8), nullable=True)
+    value = db.Column(db.Numeric(20, 8), nullable=True)
     token_transfers = db.Column(db.Text, nullable=True)
     network_id = db.Column(db.Integer, nullable=False, default=1)
     network_name = db.Column(db.String(50), nullable=False, default="ethereum")
@@ -88,15 +88,15 @@ class BlockchainTransaction(db.Model):
     error_message = db.Column(db.Text, nullable=True)
     revert_reason = db.Column(db.Text, nullable=True)
     submitted_at = db.Column(
-        db.DateTime(timezone=True), default=datetime.now(timezone.utc)
+        db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
     confirmed_at = db.Column(db.DateTime(timezone=True), nullable=True)
     created_at = db.Column(
-        db.DateTime(timezone=True), default=datetime.now(timezone.utc)
+        db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
     updated_at = db.Column(
         db.DateTime(timezone=True),
-        default=datetime.now(timezone.utc),
+        default=lambda: datetime.now(timezone.utc),
         onupdate=datetime.now(timezone.utc),
     )
 
@@ -228,11 +228,11 @@ class SmartContract(db.Model):
     last_interaction = db.Column(db.DateTime(timezone=True), nullable=True)
     deployed_at = db.Column(db.DateTime(timezone=True), nullable=False)
     created_at = db.Column(
-        db.DateTime(timezone=True), default=datetime.now(timezone.utc)
+        db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
     updated_at = db.Column(
         db.DateTime(timezone=True),
-        default=datetime.now(timezone.utc),
+        default=lambda: datetime.now(timezone.utc),
         onupdate=datetime.now(timezone.utc),
     )
 

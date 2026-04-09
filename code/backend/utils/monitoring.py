@@ -12,7 +12,13 @@ from datetime import datetime, timedelta, timezone
 from functools import wraps
 from typing import Any, Callable, Dict, List
 
-import psutil
+try:
+    import psutil
+
+    _PSUTIL_AVAILABLE = True
+except ImportError:
+    psutil = None
+    _PSUTIL_AVAILABLE = False
 
 
 @dataclass
@@ -183,6 +189,14 @@ class PerformanceMonitor:
 
     def get_system_metrics(self) -> Dict[str, Any]:
         """Get current system metrics"""
+        if not _PSUTIL_AVAILABLE:
+            return {
+                "cpu": {},
+                "memory": {},
+                "disk": {},
+                "network": {},
+                "available": False,
+            }
         try:
             cpu_percent = psutil.cpu_percent(interval=1)
             cpu_count = psutil.cpu_count()
@@ -428,28 +442,34 @@ class PerformanceMonitor:
             while self.system_metrics_enabled:
                 try:
                     system_metrics = self.get_system_metrics()
-                    if "error" not in system_metrics:
+                    if "error" not in system_metrics and system_metrics.get("cpu"):
                         self.record_metric(
-                            "system_cpu_percent", system_metrics["cpu"]["percent"]
+                            "system_cpu_percent",
+                            system_metrics["cpu"].get("percent", 0),
                         )
                         self.record_metric(
-                            "system_memory_percent", system_metrics["memory"]["percent"]
+                            "system_memory_percent",
+                            system_metrics["memory"].get("percent", 0),
                         )
                         self.record_metric(
-                            "system_disk_percent", system_metrics["disk"]["percent"]
+                            "system_disk_percent",
+                            system_metrics["disk"].get("percent", 0),
                         )
                         self.record_metric(
-                            "system_memory_used_bytes", system_metrics["memory"]["used"]
+                            "system_memory_used_bytes",
+                            system_metrics["memory"].get("used", 0),
                         )
                         self.record_metric(
                             "system_memory_available_bytes",
-                            system_metrics["memory"]["available"],
+                            system_metrics["memory"].get("available", 0),
                         )
                         self.record_metric(
-                            "system_disk_used_bytes", system_metrics["disk"]["used"]
+                            "system_disk_used_bytes",
+                            system_metrics["disk"].get("used", 0),
                         )
                         self.record_metric(
-                            "system_disk_free_bytes", system_metrics["disk"]["free"]
+                            "system_disk_free_bytes",
+                            system_metrics["disk"].get("free", 0),
                         )
                     time.sleep(30)
                 except Exception as e:

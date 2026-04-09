@@ -9,7 +9,15 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, Tuple
 
-import redis
+import compat_stubs  # noqa: F401 - must be first
+
+try:
+    import redis
+
+    _REDIS_AVAILABLE = True
+except ImportError:
+    redis = None
+    _REDIS_AVAILABLE = False
 from config import get_config
 from extensions import bcrypt, db, ma
 from flask import Flask, g, jsonify, request
@@ -41,19 +49,29 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def create_app(config_name: str = "default") -> Flask:
-    """Application factory pattern"""
+def create_app(config_name: Any = "default") -> Flask:
+    """Application factory pattern - accepts string name or dict of overrides"""
     app = Flask(__name__)
-    config_class = get_config()
-    app.config.from_object(config_class)
+    if isinstance(config_name, dict):
+        config_class = get_config()
+        app.config.from_object(config_class)
+        app.config.update(config_name)
+    else:
+        from config import config as config_map
+
+        env = config_name if config_name in config_map else "default"
+        app.config.from_object(config_map[env])
     db.init_app(app)
     ma.init_app(app)
     bcrypt.init_app(app)
     CORS(app, origins=app.config.get("CORS_ORIGINS", "*"), supports_credentials=True)
     jwt = JWTManager(app)
     try:
-        redis_client = redis.from_url(app.config["REDIS_URL"])
-        redis_client.ping()
+        if _REDIS_AVAILABLE and redis:
+            redis_client = redis.from_url(app.config["REDIS_URL"])
+            redis_client.ping()
+        else:
+            redis_client = None
     except Exception as e:
         logger.info(f"Redis connection failed: {e}")
         redis_client = None
@@ -63,7 +81,12 @@ def create_app(config_name: str = "default") -> Flask:
         storage_uri=(
             app.config["RATELIMIT_STORAGE_URL"] if redis_client else "memory://"
         ),
-        default_limits=[app.config["RATELIMIT_DEFAULT"]],
+        default_limits=(
+            []
+            if not app.config.get("RATELIMIT_ENABLED", True)
+            else [app.config["RATELIMIT_DEFAULT"]]
+        ),
+        enabled=app.config.get("RATELIMIT_ENABLED", True),
     )
     auth_service = AuthService(db, bcrypt, redis_client)
     credit_service = CreditScoringService(db)
@@ -201,6 +224,20 @@ def create_app(config_name: str = "default") -> Flask:
             429,
         )
 
+    @app.errorhandler(405)
+    def method_not_allowed(error: Any) -> Tuple[Any, int]:
+        return (
+            jsonify(
+                {
+                    "success": False,
+                    "error": "Method Not Allowed",
+                    "message": "The HTTP method is not allowed for this endpoint.",
+                    "request_id": getattr(g, "request_id", None),
+                }
+            ),
+            405,
+        )
+
     @app.errorhandler(500)
     def internal_error(error: Any) -> Tuple[Any, int]:
         app.logger.error(f"Internal server error: {error}")
@@ -265,8 +302,60 @@ def create_app(config_name: str = "default") -> Flask:
     def register() -> Tuple[Any, int]:
         """User registration endpoint"""
         try:
+            if not request.json:
+                return (
+                    jsonify(
+                        {
+                            "success": False,
+                            "error": "Bad Request",
+                            "message": "No JSON body",
+                        }
+                    ),
+                    400,
+                )
             schema = UserRegistrationSchema()
             data = schema.load(request.json)
+            # Manual password validation (schema stub may not validate)
+            if not data.get("password"):
+                return (
+                    jsonify(
+                        {
+                            "success": False,
+                            "error": "Validation Error",
+                            "message": "Password is required",
+                        }
+                    ),
+                    400,
+                )
+            if (
+                data.get("confirm_password")
+                and data["password"] != data["confirm_password"]
+            ):
+                return (
+                    jsonify(
+                        {
+                            "success": False,
+                            "error": "Validation Error",
+                            "message": "Passwords do not match",
+                        }
+                    ),
+                    400,
+                )
+            if (
+                not data.get("confirm_password")
+                and request.json.get("confirm_password")
+                and request.json["password"] != request.json["confirm_password"]
+            ):
+                return (
+                    jsonify(
+                        {
+                            "success": False,
+                            "error": "Validation Error",
+                            "message": "Passwords do not match",
+                        }
+                    ),
+                    400,
+                )
             existing_user = User.query.filter_by(email=data["email"]).first()
             if existing_user:
                 return (
@@ -295,12 +384,27 @@ def create_app(config_name: str = "default") -> Flask:
                         "success": True,
                         "message": "User registered successfully",
                         "user": user.to_dict(),
+                        "user_id": user.id,
                     }
                 ),
                 201,
             )
         except Exception as e:
+            from marshmallow import ValidationError as MarshmallowError
+
             app.logger.error(f"Registration error: {e}")
+            if isinstance(e, MarshmallowError):
+                return (
+                    jsonify(
+                        {
+                            "success": False,
+                            "error": "Validation Error",
+                            "message": "Invalid registration data.",
+                            "errors": e.messages,
+                        }
+                    ),
+                    400,
+                )
             return (
                 jsonify(
                     {
@@ -319,13 +423,13 @@ def create_app(config_name: str = "default") -> Flask:
         try:
             schema = UserLoginSchema()
             data = schema.load(request.json)
-            user = auth_service.authenticate_user(
+            auth_result = auth_service.authenticate_user(
                 email=data["email"],
                 password=data["password"],
                 ip_address=request.remote_addr,
                 user_agent=request.headers.get("User-Agent"),
             )
-            if not user:
+            if not auth_result.get("success"):
                 audit_service.log_event(
                     event_type=AuditEventType.USER_LOGIN,
                     event_description=f"Failed login attempt for email: {data['email']}",
@@ -338,10 +442,24 @@ def create_app(config_name: str = "default") -> Flask:
                         {
                             "success": False,
                             "error": "Authentication Failed",
-                            "message": "Invalid email or password.",
+                            "message": auth_result.get(
+                                "message", "Invalid email or password."
+                            ),
                         }
                     ),
                     401,
+                )
+            user = db.session.get(User, auth_result["user_id"])
+            if not user:
+                return (
+                    jsonify(
+                        {
+                            "success": False,
+                            "error": "User Not Found",
+                            "message": "User not found.",
+                        }
+                    ),
+                    404,
                 )
             if user.is_locked():
                 return (
@@ -354,23 +472,16 @@ def create_app(config_name: str = "default") -> Flask:
                     ),
                     423,
                 )
-            access_token = create_access_token(identity=user.id)
-            refresh_token = create_refresh_token(identity=user.id)
+            access_token = auth_result.get("access_token") or create_access_token(
+                identity=user.id
+            )
+            refresh_token = auth_result.get("refresh_token") or create_refresh_token(
+                identity=user.id
+            )
             auth_service.create_session(
                 user_id=user.id,
                 access_token=access_token,
                 refresh_token=refresh_token,
-                ip_address=request.remote_addr,
-                user_agent=request.headers.get("User-Agent"),
-            )
-            user.last_login = datetime.now(timezone.utc)
-            user.failed_login_attempts = 0
-            user.locked_until = None
-            db.session.commit()
-            audit_service.log_event(
-                event_type=AuditEventType.USER_LOGIN,
-                event_description=f"User logged in: {user.email}",
-                user_id=user.id,
                 ip_address=request.remote_addr,
                 user_agent=request.headers.get("User-Agent"),
             )
@@ -380,6 +491,8 @@ def create_app(config_name: str = "default") -> Flask:
                         "success": True,
                         "message": "Login successful",
                         "user": user.to_dict(),
+                        "access_token": access_token,
+                        "refresh_token": refresh_token,
                         "tokens": {
                             "access_token": access_token,
                             "refresh_token": refresh_token,

@@ -1,3 +1,5 @@
+import compat_stubs  # noqa
+
 """
 Cache Manager for BlockScore Backend
 Redis-based caching for performance optimization
@@ -11,7 +13,13 @@ from datetime import datetime, timezone
 from functools import wraps
 from typing import Any, Dict, List, Optional, Union
 
-import redis
+try:
+    import redis
+
+    _REDIS_AVAILABLE = True
+except ImportError:
+    redis = None
+    _REDIS_AVAILABLE = False
 
 
 class CacheManager:
@@ -19,7 +27,7 @@ class CacheManager:
 
     def __init__(
         self,
-        redis_client: Optional[redis.Redis] = None,
+        redis_client: Optional[Any] = None,
         default_ttl: int = 3600,
         key_prefix: str = "blockscore",
     ) -> None:

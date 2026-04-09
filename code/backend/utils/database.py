@@ -1,3 +1,5 @@
+import compat_stubs  # noqa
+
 """
 Database Optimizer for BlockScore Backend
 Database performance optimization and monitoring utilities
@@ -9,8 +11,13 @@ from contextlib import contextmanager
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
-from sqlalchemy import inspect, text
-from sqlalchemy.engine import Engine
+try:
+    from sqlalchemy import inspect, text
+    from sqlalchemy.engine import Engine
+except ImportError:
+    inspect = None
+    text = lambda s: s
+    Engine = object
 
 
 class DatabaseOptimizer:

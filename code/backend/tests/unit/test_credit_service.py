@@ -1,3 +1,11 @@
+import os
+import sys
+
+sys.path.insert(
+    0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+)
+import compat_stubs  # noqa
+
 """
 Unit tests for Credit Scoring Service
 """

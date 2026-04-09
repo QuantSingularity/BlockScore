@@ -13,8 +13,6 @@ from marshmallow import Schema, fields, validate
 
 
 class LoanStatus(enum.Enum):
-    """Loan status enumeration"""
-
     DRAFT = "draft"
     SUBMITTED = "submitted"
     UNDER_REVIEW = "under_review"
@@ -28,8 +26,6 @@ class LoanStatus(enum.Enum):
 
 
 class LoanType(enum.Enum):
-    """Loan type enumeration"""
-
     PERSONAL = "personal"
     BUSINESS = "business"
     MORTGAGE = "mortgage"
@@ -40,8 +36,6 @@ class LoanType(enum.Enum):
 
 
 class PaymentStatus(enum.Enum):
-    """Payment status enumeration"""
-
     PENDING = "pending"
     PROCESSING = "processing"
     COMPLETED = "completed"
@@ -51,8 +45,6 @@ class PaymentStatus(enum.Enum):
 
 
 class PaymentMethod(enum.Enum):
-    """Payment method enumeration"""
-
     BANK_TRANSFER = "bank_transfer"
     CREDIT_CARD = "credit_card"
     DEBIT_CARD = "debit_card"
@@ -62,29 +54,31 @@ class PaymentMethod(enum.Enum):
 
 
 class LoanApplication(db.Model):
-    """Loan application model"""
-
     __tablename__ = "loan_applications"
     id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     user_id = db.Column(
         db.String(36), db.ForeignKey("users.id"), nullable=False, index=True
     )
     application_number = db.Column(
-        db.String(20), unique=True, nullable=False, index=True
+        db.String(20), unique=True, nullable=True, index=True
     )
     loan_type = db.Column(db.Enum(LoanType), nullable=False)
-    requested_amount = db.Column(db.Decimal(15, 2), nullable=False)
+    requested_amount = db.Column(db.Numeric(15, 2), nullable=False)
     requested_term_months = db.Column(db.Integer, nullable=False)
     requested_rate = db.Column(db.Float, nullable=True)
+    purpose = db.Column(db.String(255), nullable=True)
+    employment_status = db.Column(db.String(50), nullable=True)
+    annual_income = db.Column(db.Numeric(15, 2), nullable=True)
+    monthly_expenses = db.Column(db.Numeric(15, 2), nullable=True)
     status = db.Column(db.Enum(LoanStatus), default=LoanStatus.DRAFT, nullable=False)
     status_reason = db.Column(db.Text, nullable=True)
     credit_score_at_application = db.Column(db.Integer, nullable=True)
     risk_assessment = db.Column(db.Text, nullable=True)
     approval_probability = db.Column(db.Float, nullable=True)
-    approved_amount = db.Column(db.Decimal(15, 2), nullable=True)
+    approved_amount = db.Column(db.Numeric(15, 2), nullable=True)
     approved_term_months = db.Column(db.Integer, nullable=True)
     approved_rate = db.Column(db.Float, nullable=True)
-    monthly_payment = db.Column(db.Decimal(10, 2), nullable=True)
+    monthly_payment = db.Column(db.Numeric(10, 2), nullable=True)
     application_data = db.Column(db.Text, nullable=True)
     documents = db.Column(db.Text, nullable=True)
     reviewed_by = db.Column(db.String(36), nullable=True)
@@ -95,18 +89,17 @@ class LoanApplication(db.Model):
     submitted_at = db.Column(db.DateTime(timezone=True), nullable=True)
     expires_at = db.Column(db.DateTime(timezone=True), nullable=True)
     created_at = db.Column(
-        db.DateTime(timezone=True), default=datetime.now(timezone.utc)
+        db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
     updated_at = db.Column(
         db.DateTime(timezone=True),
-        default=datetime.now(timezone.utc),
-        onupdate=datetime.now(timezone.utc),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
     )
     loan = db.relationship("Loan", backref="application", uselist=False)
 
     @staticmethod
     def generate_application_number() -> str:
-        """Generate unique application number"""
         import secrets
 
         timestamp = datetime.now(timezone.utc).strftime("%Y%m%d")
@@ -114,7 +107,6 @@ class LoanApplication(db.Model):
         return f"APP{timestamp}{random_part}"
 
     def get_application_data(self) -> Dict[str, Any]:
-        """Get parsed application data"""
         if self.application_data:
             try:
                 return json.loads(self.application_data)
@@ -123,11 +115,9 @@ class LoanApplication(db.Model):
         return {}
 
     def set_application_data(self, data: Any) -> None:
-        """Set application data as JSON"""
         self.application_data = json.dumps(data) if data else None
 
     def get_risk_assessment(self) -> Dict[str, Any]:
-        """Get parsed risk assessment"""
         if self.risk_assessment:
             try:
                 return json.loads(self.risk_assessment)
@@ -136,17 +126,17 @@ class LoanApplication(db.Model):
         return {}
 
     def set_risk_assessment(self, data: Any) -> None:
-        """Set risk assessment as JSON"""
         self.risk_assessment = json.dumps(data) if data else None
 
     def is_expired(self) -> bool:
-        """Check if application is expired"""
         if self.expires_at:
-            return datetime.now(timezone.utc) > self.expires_at
+            expires = self.expires_at
+            if expires.tzinfo is None:
+                expires = expires.replace(tzinfo=timezone.utc)
+            return datetime.now(timezone.utc) > expires
         return False
 
     def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary for JSON serialization"""
         return {
             "id": self.id,
             "user_id": self.user_id,
@@ -155,6 +145,7 @@ class LoanApplication(db.Model):
             "requested_amount": float(self.requested_amount),
             "requested_term_months": self.requested_term_months,
             "requested_rate": self.requested_rate,
+            "purpose": self.purpose,
             "status": self.status.value,
             "status_reason": self.status_reason,
             "credit_score_at_application": self.credit_score_at_application,
@@ -185,8 +176,6 @@ class LoanApplication(db.Model):
 
 
 class Loan(db.Model):
-    """Active loan model"""
-
     __tablename__ = "loans"
     id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     user_id = db.Column(
@@ -197,33 +186,33 @@ class Loan(db.Model):
     )
     loan_number = db.Column(db.String(20), unique=True, nullable=False, index=True)
     loan_type = db.Column(db.Enum(LoanType), nullable=False)
-    principal_amount = db.Column(db.Decimal(15, 2), nullable=False)
+    principal_amount = db.Column(db.Numeric(15, 2), nullable=False)
     interest_rate = db.Column(db.Float, nullable=False)
     term_months = db.Column(db.Integer, nullable=False)
-    monthly_payment = db.Column(db.Decimal(10, 2), nullable=False)
+    monthly_payment = db.Column(db.Numeric(10, 2), nullable=False)
     status = db.Column(db.Enum(LoanStatus), default=LoanStatus.APPROVED, nullable=False)
-    current_balance = db.Column(db.Decimal(15, 2), nullable=False)
-    total_paid = db.Column(db.Decimal(15, 2), default=0, nullable=False)
+    current_balance = db.Column(db.Numeric(15, 2), nullable=False)
+    total_paid = db.Column(db.Numeric(15, 2), default=0, nullable=False)
     payments_made = db.Column(db.Integer, default=0, nullable=False)
     payments_remaining = db.Column(db.Integer, nullable=False)
     first_payment_date = db.Column(db.Date, nullable=False)
     last_payment_date = db.Column(db.Date, nullable=False)
     next_payment_date = db.Column(db.Date, nullable=True)
-    next_payment_amount = db.Column(db.Decimal(10, 2), nullable=True)
+    next_payment_amount = db.Column(db.Numeric(10, 2), nullable=True)
     days_past_due = db.Column(db.Integer, default=0)
-    late_fees = db.Column(db.Decimal(10, 2), default=0)
+    late_fees = db.Column(db.Numeric(10, 2), default=0)
     total_late_payments = db.Column(db.Integer, default=0)
     smart_contract_address = db.Column(db.String(42), nullable=True, index=True)
     blockchain_verified = db.Column(db.Boolean, default=False)
     disbursed_at = db.Column(db.DateTime(timezone=True), nullable=True)
     maturity_date = db.Column(db.Date, nullable=False)
     created_at = db.Column(
-        db.DateTime(timezone=True), default=datetime.now(timezone.utc)
+        db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
     updated_at = db.Column(
         db.DateTime(timezone=True),
-        default=datetime.now(timezone.utc),
-        onupdate=datetime.now(timezone.utc),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
     )
     payments = db.relationship(
         "LoanPayment", backref="loan", cascade="all, delete-orphan"
@@ -231,7 +220,6 @@ class Loan(db.Model):
 
     @staticmethod
     def generate_loan_number() -> str:
-        """Generate unique loan number"""
         import secrets
 
         timestamp = datetime.now(timezone.utc).strftime("%Y%m%d")
@@ -239,30 +227,23 @@ class Loan(db.Model):
         return f"LN{timestamp}{random_part}"
 
     def calculate_remaining_balance(self) -> float:
-        """Calculate remaining balance based on payments"""
         total_payments = sum(
-            (
-                payment.amount
-                for payment in self.payments
-                if payment.status == PaymentStatus.COMPLETED
-            )
+            float(payment.amount)
+            for payment in self.payments
+            if payment.status == PaymentStatus.COMPLETED
         )
         return float(self.principal_amount) - total_payments - float(self.late_fees)
 
     def is_current(self) -> bool:
-        """Check if loan is current (not past due)"""
         return self.days_past_due == 0
 
     def is_delinquent(self) -> bool:
-        """Check if loan is delinquent (30+ days past due)"""
         return self.days_past_due >= 30
 
     def is_in_default(self) -> bool:
-        """Check if loan is in default (90+ days past due)"""
         return self.days_past_due >= 90
 
     def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary for JSON serialization"""
         return {
             "id": self.id,
             "user_id": self.user_id,
@@ -304,18 +285,16 @@ class Loan(db.Model):
 
 
 class LoanPayment(db.Model):
-    """Loan payment model"""
-
     __tablename__ = "loan_payments"
     id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     loan_id = db.Column(
         db.String(36), db.ForeignKey("loans.id"), nullable=False, index=True
     )
     payment_number = db.Column(db.Integer, nullable=False)
-    amount = db.Column(db.Decimal(10, 2), nullable=False)
-    principal_amount = db.Column(db.Decimal(10, 2), nullable=False)
-    interest_amount = db.Column(db.Decimal(10, 2), nullable=False)
-    late_fee = db.Column(db.Decimal(10, 2), default=0)
+    amount = db.Column(db.Numeric(10, 2), nullable=False)
+    principal_amount = db.Column(db.Numeric(10, 2), nullable=False)
+    interest_amount = db.Column(db.Numeric(10, 2), nullable=False)
+    late_fee = db.Column(db.Numeric(10, 2), default=0)
     status = db.Column(
         db.Enum(PaymentStatus), default=PaymentStatus.PENDING, nullable=False
     )
@@ -329,28 +308,25 @@ class LoanPayment(db.Model):
     blockchain_hash = db.Column(db.String(66), nullable=True, index=True)
     blockchain_verified = db.Column(db.Boolean, default=False)
     created_at = db.Column(
-        db.DateTime(timezone=True), default=datetime.now(timezone.utc)
+        db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
     updated_at = db.Column(
         db.DateTime(timezone=True),
-        default=datetime.now(timezone.utc),
-        onupdate=datetime.now(timezone.utc),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
     )
 
     def is_late(self) -> bool:
-        """Check if payment is late"""
         if self.status == PaymentStatus.COMPLETED:
             return False
         return datetime.now(timezone.utc).date() > self.due_date
 
     def days_late(self) -> int:
-        """Calculate days late"""
         if not self.is_late():
             return 0
         return (datetime.now(timezone.utc).date() - self.due_date).days
 
     def get_processor_response(self) -> Dict[str, Any]:
-        """Get parsed processor response"""
         if self.processor_response:
             try:
                 return json.loads(self.processor_response)
@@ -359,11 +335,9 @@ class LoanPayment(db.Model):
         return {}
 
     def set_processor_response(self, data: Any) -> None:
-        """Set processor response as JSON"""
         self.processor_response = json.dumps(data) if data else None
 
     def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary for JSON serialization"""
         return {
             "id": self.id,
             "loan_id": self.loan_id,
@@ -396,8 +370,6 @@ class LoanPayment(db.Model):
 
 
 class LoanApplicationSchema(Schema):
-    """Schema for loan application"""
-
     loan_type = fields.Str(
         required=True, validate=validate.OneOf([e.value for e in LoanType])
     )
@@ -414,8 +386,6 @@ class LoanApplicationSchema(Schema):
 
 
 class LoanApplicationResponseSchema(Schema):
-    """Schema for loan application response"""
-
     id = fields.Str(dump_only=True)
     application_number = fields.Str(dump_only=True)
     status = fields.Str(dump_only=True)
@@ -427,8 +397,6 @@ class LoanApplicationResponseSchema(Schema):
 
 
 class LoanSchema(Schema):
-    """Schema for loan serialization"""
-
     id = fields.Str(dump_only=True)
     loan_number = fields.Str(dump_only=True)
     loan_type = fields.Str(dump_only=True)
@@ -446,8 +414,6 @@ class LoanSchema(Schema):
 
 
 class LoanPaymentSchema(Schema):
-    """Schema for loan payment"""
-
     amount = fields.Decimal(required=True, places=2, validate=validate.Range(min=0.01))
     payment_method = fields.Str(
         required=True, validate=validate.OneOf([e.value for e in PaymentMethod])
@@ -456,8 +422,6 @@ class LoanPaymentSchema(Schema):
 
 
 class LoanPaymentResponseSchema(Schema):
-    """Schema for loan payment response"""
-
     id = fields.Str(dump_only=True)
     payment_number = fields.Int(dump_only=True)
     amount = fields.Decimal(places=2, dump_only=True)

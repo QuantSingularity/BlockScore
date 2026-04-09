@@ -13,8 +13,6 @@ from marshmallow import Schema, fields, validate
 
 
 class CreditScoreStatus(enum.Enum):
-    """Credit score status enumeration"""
-
     CALCULATING = "calculating"
     ACTIVE = "active"
     EXPIRED = "expired"
@@ -23,8 +21,6 @@ class CreditScoreStatus(enum.Enum):
 
 
 class CreditFactorType(enum.Enum):
-    """Credit factor type enumeration"""
-
     PAYMENT_HISTORY = "payment_history"
     CREDIT_UTILIZATION = "credit_utilization"
     LENGTH_OF_HISTORY = "length_of_history"
@@ -36,8 +32,6 @@ class CreditFactorType(enum.Enum):
 
 
 class CreditEventType(enum.Enum):
-    """Credit event type enumeration"""
-
     LOAN_APPLICATION = "loan_application"
     LOAN_APPROVAL = "loan_approval"
     LOAN_DISBURSEMENT = "loan_disbursement"
@@ -47,11 +41,11 @@ class CreditEventType(enum.Enum):
     LOAN_CLOSED = "loan_closed"
     CREDIT_INQUIRY = "credit_inquiry"
     SCORE_RECALCULATION = "score_recalculation"
+    ACCOUNT_OPENED = "account_opened"
+    ACCOUNT_CLOSED = "account_closed"
 
 
 class CreditScore(db.Model):
-    """Credit score model with versioning and audit trail"""
-
     __tablename__ = "credit_scores"
     id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     user_id = db.Column(
@@ -70,23 +64,25 @@ class CreditScore(db.Model):
     income_stability_score = db.Column(db.Integer, nullable=True)
     debt_to_income_score = db.Column(db.Integer, nullable=True)
     blockchain_activity_score = db.Column(db.Integer, nullable=True)
+    factors_positive = db.Column(db.Text, nullable=True)
+    factors_negative = db.Column(db.Text, nullable=True)
     model_name = db.Column(db.String(100), nullable=False, default="BlockScore_v1.0")
     model_confidence = db.Column(db.Float, nullable=True)
     calculation_method = db.Column(db.Text, nullable=True)
     calculated_at = db.Column(
-        db.DateTime(timezone=True), default=datetime.now(timezone.utc)
+        db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
     expires_at = db.Column(db.DateTime(timezone=True), nullable=True)
     valid_until = db.Column(db.DateTime(timezone=True), nullable=True)
     blockchain_hash = db.Column(db.String(66), nullable=True, index=True)
     blockchain_verified = db.Column(db.Boolean, default=False)
     created_at = db.Column(
-        db.DateTime(timezone=True), default=datetime.now(timezone.utc)
+        db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
     updated_at = db.Column(
         db.DateTime(timezone=True),
-        default=datetime.now(timezone.utc),
-        onupdate=datetime.now(timezone.utc),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
     )
     factors = db.relationship(
         "CreditFactor", backref="credit_score", cascade="all, delete-orphan"
@@ -96,19 +92,44 @@ class CreditScore(db.Model):
     )
 
     def is_valid(self) -> bool:
-        """Check if credit score is still valid"""
         if self.valid_until:
-            return datetime.now(timezone.utc) < self.valid_until
+            valid_until = self.valid_until
+            if valid_until.tzinfo is None:
+                valid_until = valid_until.replace(tzinfo=timezone.utc)
+            return datetime.now(timezone.utc) < valid_until
         return True
 
     def is_expired(self) -> bool:
-        """Check if credit score is expired"""
         if self.expires_at:
-            return datetime.now(timezone.utc) > self.expires_at
+            expires_at = self.expires_at
+            if expires_at.tzinfo is None:
+                expires_at = expires_at.replace(tzinfo=timezone.utc)
+            return datetime.now(timezone.utc) > expires_at
         return False
 
+    def get_factors_positive(self):
+        if self.factors_positive:
+            try:
+                return json.loads(self.factors_positive)
+            except Exception:
+                return []
+        return []
+
+    def set_factors_positive(self, value):
+        self.factors_positive = json.dumps(value) if value is not None else None
+
+    def get_factors_negative(self):
+        if self.factors_negative:
+            try:
+                return json.loads(self.factors_negative)
+            except Exception:
+                return []
+        return []
+
+    def set_factors_negative(self, value):
+        self.factors_negative = json.dumps(value) if value is not None else None
+
     def get_score_breakdown(self) -> Dict[str, Any]:
-        """Get detailed score breakdown"""
         return {
             "total_score": self.score,
             "payment_history": self.payment_history_score,
@@ -122,7 +143,6 @@ class CreditScore(db.Model):
         }
 
     def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary for JSON serialization"""
         return {
             "id": self.id,
             "user_id": self.user_id,
@@ -130,6 +150,8 @@ class CreditScore(db.Model):
             "score_version": self.score_version,
             "status": self.status.value,
             "score_breakdown": self.get_score_breakdown(),
+            "factors_positive": self.get_factors_positive(),
+            "factors_negative": self.get_factors_negative(),
             "model_name": self.model_name,
             "model_confidence": self.model_confidence,
             "calculated_at": self.calculated_at.isoformat(),
@@ -145,8 +167,6 @@ class CreditScore(db.Model):
 
 
 class CreditFactor(db.Model):
-    """Individual credit factors that contribute to the overall score"""
-
     __tablename__ = "credit_factors"
     id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     credit_score_id = db.Column(
@@ -163,16 +183,15 @@ class CreditFactor(db.Model):
     confidence_level = db.Column(db.Float, nullable=True)
     calculation_details = db.Column(db.Text, nullable=True)
     created_at = db.Column(
-        db.DateTime(timezone=True), default=datetime.now(timezone.utc)
+        db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
     updated_at = db.Column(
         db.DateTime(timezone=True),
-        default=datetime.now(timezone.utc),
-        onupdate=datetime.now(timezone.utc),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
     )
 
     def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary for JSON serialization"""
         return {
             "id": self.id,
             "credit_score_id": self.credit_score_id,
@@ -191,8 +210,6 @@ class CreditFactor(db.Model):
 
 
 class CreditHistory(db.Model):
-    """Credit history events and timeline"""
-
     __tablename__ = "credit_history"
     id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     user_id = db.Column(
@@ -202,32 +219,37 @@ class CreditHistory(db.Model):
         db.String(36), db.ForeignKey("credit_scores.id"), nullable=True
     )
     event_type = db.Column(db.Enum(CreditEventType), nullable=False)
-    event_title = db.Column(db.String(255), nullable=False)
+    event_title = db.Column(db.String(255), nullable=True)
     event_description = db.Column(db.Text, nullable=True)
+    description = db.Column(db.Text, nullable=True)
     event_data = db.Column(db.Text, nullable=True)
-    amount = db.Column(db.Decimal(15, 2), nullable=True)
+    amount = db.Column(db.Numeric(15, 2), nullable=True)
     currency = db.Column(db.String(3), nullable=True, default="USD")
     score_before = db.Column(db.Integer, nullable=True)
     score_after = db.Column(db.Integer, nullable=True)
     score_change = db.Column(db.Integer, nullable=True)
+    impact_score = db.Column(db.Integer, nullable=True)
     loan_id = db.Column(db.String(36), nullable=True)
     transaction_id = db.Column(db.String(255), nullable=True)
     blockchain_hash = db.Column(db.String(66), nullable=True)
-    event_date = db.Column(db.DateTime(timezone=True), nullable=False)
+    event_date = db.Column(
+        db.DateTime(timezone=True),
+        nullable=False,
+        default=lambda: datetime.now(timezone.utc),
+    )
     reported_date = db.Column(
-        db.DateTime(timezone=True), default=datetime.now(timezone.utc)
+        db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
     created_at = db.Column(
-        db.DateTime(timezone=True), default=datetime.now(timezone.utc)
+        db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
     updated_at = db.Column(
         db.DateTime(timezone=True),
-        default=datetime.now(timezone.utc),
-        onupdate=datetime.now(timezone.utc),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
     )
 
     def get_event_data(self) -> Dict[str, Any]:
-        """Get parsed event data"""
         if self.event_data:
             try:
                 return json.loads(self.event_data)
@@ -236,24 +258,23 @@ class CreditHistory(db.Model):
         return {}
 
     def set_event_data(self, data: Any) -> None:
-        """Set event data as JSON"""
         self.event_data = json.dumps(data) if data else None
 
     def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary for JSON serialization"""
         return {
             "id": self.id,
             "user_id": self.user_id,
             "credit_score_id": self.credit_score_id,
             "event_type": self.event_type.value,
             "event_title": self.event_title,
-            "event_description": self.event_description,
+            "event_description": self.event_description or self.description,
             "event_data": self.get_event_data(),
             "amount": float(self.amount) if self.amount else None,
             "currency": self.currency,
             "score_before": self.score_before,
             "score_after": self.score_after,
             "score_change": self.score_change,
+            "impact_score": self.impact_score,
             "loan_id": self.loan_id,
             "transaction_id": self.transaction_id,
             "blockchain_hash": self.blockchain_hash,
@@ -265,8 +286,6 @@ class CreditHistory(db.Model):
 
 
 class CreditScoreSchema(Schema):
-    """Schema for credit score serialization"""
-
     id = fields.Str(dump_only=True)
     user_id = fields.Str(dump_only=True)
     score = fields.Int(validate=validate.Range(min=300, max=850))
@@ -287,8 +306,6 @@ class CreditScoreSchema(Schema):
 
 
 class CreditFactorSchema(Schema):
-    """Schema for credit factor serialization"""
-
     id = fields.Str(dump_only=True)
     credit_score_id = fields.Str(dump_only=True)
     factor_type = fields.Str(dump_only=True)
@@ -309,8 +326,6 @@ class CreditFactorSchema(Schema):
 
 
 class CreditHistorySchema(Schema):
-    """Schema for credit history serialization"""
-
     id = fields.Str(dump_only=True)
     user_id = fields.Str(dump_only=True)
     credit_score_id = fields.Str(dump_only=True)
@@ -333,8 +348,6 @@ class CreditHistorySchema(Schema):
 
 
 class CreditScoreCalculationRequest(Schema):
-    """Schema for credit score calculation request"""
-
     user_id = fields.Str(required=True)
     force_recalculation = fields.Bool(load_default=False)
     include_factors = fields.Bool(load_default=True)

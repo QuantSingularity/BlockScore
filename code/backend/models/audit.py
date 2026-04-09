@@ -13,8 +13,6 @@ from marshmallow import Schema, fields, validate
 
 
 class AuditEventType(enum.Enum):
-    """Audit event type enumeration"""
-
     USER_LOGIN = "user_login"
     USER_LOGOUT = "user_logout"
     USER_REGISTRATION = "user_registration"
@@ -31,20 +29,20 @@ class AuditEventType(enum.Enum):
     SECURITY_ALERT = "security_alert"
     COMPLIANCE_CHECK = "compliance_check"
     BLOCKCHAIN_TRANSACTION = "blockchain_transaction"
+    MFA_SETUP = "mfa_setup"
+    MFA_DISABLED = "mfa_disabled"
+    MFA_VERIFIED = "mfa_verified"
 
 
 class AuditSeverity(enum.Enum):
-    """Audit severity enumeration"""
-
     LOW = "low"
     MEDIUM = "medium"
     HIGH = "high"
     CRITICAL = "critical"
+    INFO = "info"
 
 
 class ComplianceType(enum.Enum):
-    """Compliance type enumeration"""
-
     KYC = "kyc"
     AML = "aml"
     GDPR = "gdpr"
@@ -56,22 +54,23 @@ class ComplianceType(enum.Enum):
 
 
 class ComplianceStatus(enum.Enum):
-    """Compliance status enumeration"""
-
     COMPLIANT = "compliant"
     NON_COMPLIANT = "non_compliant"
     PENDING_REVIEW = "pending_review"
     REQUIRES_ACTION = "requires_action"
     EXEMPTED = "exempted"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+    FLAGGED = "flagged"
 
 
 class AuditLog(db.Model):
-    """Comprehensive audit log for all system activities"""
-
     __tablename__ = "audit_logs"
     id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     event_type = db.Column(db.Enum(AuditEventType), nullable=False, index=True)
-    event_category = db.Column(db.String(50), nullable=False, index=True)
+    event_category = db.Column(
+        db.String(50), nullable=False, index=True, default="general"
+    )
     event_description = db.Column(db.Text, nullable=False)
     severity = db.Column(
         db.Enum(AuditSeverity), default=AuditSeverity.LOW, nullable=False
@@ -97,16 +96,15 @@ class AuditLog(db.Model):
     blockchain_verified = db.Column(db.Boolean, default=False)
     event_timestamp = db.Column(
         db.DateTime(timezone=True),
-        default=datetime.now(timezone.utc),
+        default=lambda: datetime.now(timezone.utc),
         nullable=False,
         index=True,
     )
     created_at = db.Column(
-        db.DateTime(timezone=True), default=datetime.now(timezone.utc)
+        db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
 
     def get_event_data(self) -> Dict[str, Any]:
-        """Get parsed event data"""
         if self.event_data:
             try:
                 return json.loads(self.event_data)
@@ -115,11 +113,9 @@ class AuditLog(db.Model):
         return {}
 
     def set_event_data(self, data: Any) -> None:
-        """Set event data as JSON"""
         self.event_data = json.dumps(data) if data else None
 
     def get_before_state(self) -> Dict[str, Any]:
-        """Get parsed before state"""
         if self.before_state:
             try:
                 return json.loads(self.before_state)
@@ -128,11 +124,9 @@ class AuditLog(db.Model):
         return {}
 
     def set_before_state(self, data: Any) -> None:
-        """Set before state as JSON"""
         self.before_state = json.dumps(data) if data else None
 
     def get_after_state(self) -> Dict[str, Any]:
-        """Get parsed after state"""
         if self.after_state:
             try:
                 return json.loads(self.after_state)
@@ -141,11 +135,9 @@ class AuditLog(db.Model):
         return {}
 
     def set_after_state(self, data: Any) -> None:
-        """Set after state as JSON"""
         self.after_state = json.dumps(data) if data else None
 
     def get_request_headers(self) -> Dict[str, Any]:
-        """Get parsed request headers"""
         if self.request_headers:
             try:
                 return json.loads(self.request_headers)
@@ -154,7 +146,6 @@ class AuditLog(db.Model):
         return {}
 
     def set_request_headers(self, headers: Any) -> None:
-        """Set request headers as JSON (excluding sensitive headers)"""
         if headers:
             safe_headers = {
                 k: v
@@ -164,7 +155,6 @@ class AuditLog(db.Model):
             self.request_headers = json.dumps(safe_headers)
 
     def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary for JSON serialization"""
         return {
             "id": self.id,
             "event_type": self.event_type.value,
@@ -191,8 +181,6 @@ class AuditLog(db.Model):
 
 
 class ComplianceRecord(db.Model):
-    """Compliance tracking and reporting"""
-
     __tablename__ = "compliance_records"
     id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     compliance_type = db.Column(db.Enum(ComplianceType), nullable=False, index=True)
@@ -206,28 +194,29 @@ class ComplianceRecord(db.Model):
     violations = db.Column(db.Text, nullable=True)
     remediation_actions = db.Column(db.Text, nullable=True)
     assessed_by = db.Column(db.String(36), nullable=True)
+    reviewed_by = db.Column(db.String(36), nullable=True)
+    reviewed_at = db.Column(db.DateTime(timezone=True), nullable=True)
     assessment_method = db.Column(db.String(50), nullable=True)
     valid_from = db.Column(
-        db.DateTime(timezone=True), default=datetime.now(timezone.utc)
+        db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
     valid_until = db.Column(db.DateTime(timezone=True), nullable=True)
     next_review_date = db.Column(db.DateTime(timezone=True), nullable=True)
     supporting_documents = db.Column(db.Text, nullable=True)
     notes = db.Column(db.Text, nullable=True)
     assessed_at = db.Column(
-        db.DateTime(timezone=True), default=datetime.now(timezone.utc)
+        db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
     created_at = db.Column(
-        db.DateTime(timezone=True), default=datetime.now(timezone.utc)
+        db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
     updated_at = db.Column(
         db.DateTime(timezone=True),
-        default=datetime.now(timezone.utc),
-        onupdate=datetime.now(timezone.utc),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
     )
 
     def get_assessment_data(self) -> Dict[str, Any]:
-        """Get parsed assessment data"""
         if self.assessment_data:
             try:
                 return json.loads(self.assessment_data)
@@ -236,11 +225,9 @@ class ComplianceRecord(db.Model):
         return {}
 
     def set_assessment_data(self, data: Any) -> None:
-        """Set assessment data as JSON"""
         self.assessment_data = json.dumps(data) if data else None
 
     def get_violations(self) -> List[Any]:
-        """Get parsed violations"""
         if self.violations:
             try:
                 return json.loads(self.violations)
@@ -249,11 +236,9 @@ class ComplianceRecord(db.Model):
         return []
 
     def set_violations(self, violations: Any) -> None:
-        """Set violations as JSON"""
         self.violations = json.dumps(violations) if violations else None
 
     def get_remediation_actions(self) -> List[Any]:
-        """Get parsed remediation actions"""
         if self.remediation_actions:
             try:
                 return json.loads(self.remediation_actions)
@@ -262,24 +247,26 @@ class ComplianceRecord(db.Model):
         return []
 
     def set_remediation_actions(self, actions: Any) -> None:
-        """Set remediation actions as JSON"""
         self.remediation_actions = json.dumps(actions) if actions else None
 
     def is_valid(self) -> bool:
-        """Check if compliance record is still valid"""
         now = datetime.now(timezone.utc)
         if self.valid_until:
-            return now < self.valid_until
+            valid_until = self.valid_until
+            if valid_until.tzinfo is None:
+                valid_until = valid_until.replace(tzinfo=timezone.utc)
+            return now < valid_until
         return True
 
     def needs_review(self) -> bool:
-        """Check if compliance record needs review"""
         if self.next_review_date:
-            return datetime.now(timezone.utc) >= self.next_review_date
+            next_review = self.next_review_date
+            if next_review.tzinfo is None:
+                next_review = next_review.replace(tzinfo=timezone.utc)
+            return datetime.now(timezone.utc) >= next_review
         return False
 
     def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary for JSON serialization"""
         return {
             "id": self.id,
             "compliance_type": self.compliance_type.value,
@@ -309,8 +296,6 @@ class ComplianceRecord(db.Model):
 
 
 class AuditLogSchema(Schema):
-    """Schema for audit log serialization"""
-
     id = fields.Str(dump_only=True)
     event_type = fields.Str(dump_only=True)
     event_category = fields.Str(dump_only=True)
@@ -334,8 +319,6 @@ class AuditLogSchema(Schema):
 
 
 class ComplianceRecordSchema(Schema):
-    """Schema for compliance record serialization"""
-
     id = fields.Str(dump_only=True)
     compliance_type = fields.Str(dump_only=True)
     regulation_name = fields.Str(dump_only=True)
@@ -361,8 +344,6 @@ class ComplianceRecordSchema(Schema):
 
 
 class AuditLogQuerySchema(Schema):
-    """Schema for audit log query parameters"""
-
     event_type = fields.Str(
         validate=validate.OneOf([e.value for e in AuditEventType]), allow_none=True
     )
@@ -377,8 +358,6 @@ class AuditLogQuerySchema(Schema):
 
 
 class ComplianceReportSchema(Schema):
-    """Schema for compliance reporting"""
-
     compliance_type = fields.Str(
         validate=validate.OneOf([e.value for e in ComplianceType]), allow_none=True
     )
