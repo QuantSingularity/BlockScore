@@ -1,8 +1,10 @@
 """
 BlockScore Model Integration Module
 
-This module provides utilities for integrating the Python scoring model with the Node.js API.
-It includes functions for data transformation, model inference, and API communication.
+This module provides the shared feature-engineering and inference logic used
+by the ai_models Flask service (server.py) to score credit history data
+submitted by the BlockScore backend (code/backend/services/credit_service.py)
+over HTTP via the /predict and /batch-predict endpoints.
 """
 
 import logging

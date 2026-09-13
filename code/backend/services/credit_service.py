@@ -9,6 +9,8 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
+import requests
+
 try:
     import joblib
 
@@ -54,6 +56,15 @@ class CreditScoringService:
         self.min_score = 300
         self.max_score = 850
         self.default_score = 300
+        # HTTP endpoint for the code/ai_models scoring microservice (see
+        # code/docker-compose.yml, which points this at the "ai_model"
+        # container). Falls back to the conventional local port so the
+        # service also works when ai_models/server.py is run standalone
+        # outside of docker-compose.
+        self.ai_model_url = os.getenv("AI_MODEL_URL", "http://localhost:5001").rstrip(
+            "/"
+        )
+        self.ai_model_timeout = float(os.getenv("AI_MODEL_TIMEOUT", "5"))
         self.factor_weights = {
             CreditFactorType.PAYMENT_HISTORY: 0.35,
             CreditFactorType.CREDIT_UTILIZATION: 0.3,
@@ -268,26 +279,56 @@ class CreditScoringService:
         }
 
     def is_model_loaded(self) -> bool:
-        """Check if AI model is loaded"""
+        """Check if the local fallback AI model is loaded"""
         return self.model is not None
 
+    def is_ai_service_available(self) -> bool:
+        """Check whether the code/ai_models HTTP scoring service is
+        reachable, for health checks (see /api/health in app.py)."""
+        try:
+            response = requests.get(f"{self.ai_model_url}/health", timeout=2)
+            return response.status_code == 200
+        except requests.exceptions.RequestException:
+            return False
+
     def _load_model(self) -> Any:
-        """Load AI model for credit scoring"""
+        """Load a local copy of the AI model as a same-process fallback.
+
+        The primary integration path is the code/ai_models HTTP service
+        (see _call_ai_model / _request_ai_prediction below). This local
+        joblib model is only used if that service can't be reached, and
+        only when code/ai_models/credit_scoring_model.pkl happens to be
+        available on disk next to code/backend (e.g. running the backend
+        directly out of a full monorepo checkout). It is never required -
+        joblib/pandas are optional dependencies for the backend and
+        _call_ai_model degrades to rule-based scoring if neither the
+        service nor this local model is available.
+        """
         if not _JOBLIB_AVAILABLE:
-            self.logger.warning("joblib not available; using rule-based scoring.")
+            self.logger.info(
+                "joblib not installed; local AI model fallback disabled "
+                "(the ai_models HTTP service and rule-based scoring are "
+                "still available)."
+            )
             self.model = None
             return
         try:
+            # __file__ is code/backend/services/credit_service.py, so this
+            # needs to climb three levels (services -> backend -> code)
+            # before descending into the ai_models sibling directory.
             model_path = os.path.join(
-                os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                os.path.dirname(
+                    os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                ),
                 "ai_models",
                 "credit_scoring_model.pkl",
             )
             self.model = joblib.load(model_path)
-            self.logger.info("Credit scoring model loaded successfully")
+            self.logger.info(f"Loaded local fallback AI model from {model_path}")
         except Exception as e:
-            self.logger.warning(
-                f"Could not load AI model: {e}. Using rule-based scoring."
+            self.logger.info(
+                f"No local fallback AI model available ({e}); relying on the "
+                "ai_models HTTP service and rule-based scoring."
             )
             self.model = None
 
@@ -1165,15 +1206,213 @@ class CreditScoringService:
             return False
 
     def _call_ai_model(self, features: Dict[str, Any]) -> Dict[str, Any]:
-        """Call the AI model for scoring (stub, patchable in tests)"""
-        if self.model and _PANDAS_AVAILABLE:
+        """Score a user via the code/ai_models scoring service.
+
+        `features` is the dict produced by _gather_scoring_data (user_id,
+        wallet_address, profile_data, credit_history, blockchain_data,
+        financial_data). This method:
+
+        1. Converts the on-file credit_history events into the record
+           shape the ai_models service expects (see _build_ai_history_records
+           and code/ai_models/model_integration.py:transform_blockchain_data).
+        2. POSTs them to the ai_models /predict endpoint (AI_MODEL_URL).
+        3. Falls back to a local joblib model if the service is unreachable.
+        4. Falls back to a neutral default score if neither is available.
+
+        Patchable in tests via unittest.mock.patch.object(service, "_call_ai_model").
+        """
+        history_records = self._build_ai_history_records(features)
+
+        ai_response = self._request_ai_prediction(history_records)
+        if ai_response is not None:
+            return ai_response
+
+        if self.model is not None and _PANDAS_AVAILABLE and history_records:
             try:
-                df = pd.DataFrame([features])
+                local_features = self._extract_local_model_features(history_records)
+                df = pd.DataFrame([local_features])
                 score = int(self.model.predict(df)[0])
-                return {"score": score, "confidence": 0.85, "factors": {}}
+                score = max(self.min_score, min(self.max_score, score))
+                return {"score": score, "confidence": 0.75, "factors": {}}
             except Exception as e:
-                self.logger.error(f"AI model call failed: {e}")
+                self.logger.error(f"Local AI model fallback failed: {e}")
+
         return {"score": self.default_score, "confidence": 0.5, "factors": {}}
+
+    def _request_ai_prediction(
+        self, history_records: List[Dict[str, Any]]
+    ) -> Optional[Dict[str, Any]]:
+        """POST credit history to the ai_models /predict endpoint.
+
+        Returns None (rather than raising) on any network error, timeout,
+        or malformed response so callers can fall back cleanly - the AI
+        model service is a best-effort enhancement, never a hard
+        dependency for producing a credit score.
+        """
+        if not history_records:
+            return None
+        try:
+            response = requests.post(
+                f"{self.ai_model_url}/predict",
+                json={"creditHistory": history_records},
+                timeout=self.ai_model_timeout,
+            )
+            response.raise_for_status()
+            payload = response.json()
+            score = payload.get("score")
+            if score is None:
+                self.logger.warning(
+                    f"AI model service response missing 'score': {payload}"
+                )
+                return None
+            return {
+                "score": max(self.min_score, min(self.max_score, int(score))),
+                "confidence": float(payload.get("confidence", 0.85)),
+                "factors": payload.get("factors", {}),
+            }
+        except requests.exceptions.RequestException as e:
+            self.logger.warning(
+                f"AI model service at {self.ai_model_url} unreachable: {e}"
+            )
+        except (ValueError, TypeError, KeyError) as e:
+            self.logger.error(f"AI model service returned an unexpected response: {e}")
+        return None
+
+    @staticmethod
+    def _event_epoch_seconds(value: Any) -> int:
+        """Convert a CreditHistory event_date (datetime, possibly naive) to
+        a Unix timestamp, matching the epoch-seconds format ai_models
+        expects for "timestamp"/"repaymentTimestamp"."""
+        if isinstance(value, datetime):
+            if value.tzinfo is None:
+                value = value.replace(tzinfo=timezone.utc)
+            return int(value.timestamp())
+        return int(datetime.now(timezone.utc).timestamp())
+
+    def _build_ai_history_records(
+        self, scoring_data: Dict[str, Any]
+    ) -> List[Dict[str, Any]]:
+        """Translate internal CreditHistory events into the record shape the
+        ai_models service consumes: {timestamp, amount, repaid,
+        repaymentTimestamp, provider, recordType, scoreImpact}
+        (see code/ai_models/model_integration.py:transform_blockchain_data).
+
+        Loan lifecycle events are matched heuristically since CreditHistory
+        doesn't currently track a strict disbursement/closure link beyond
+        the shared loan_id: a LOAN_DISBURSEMENT is "repaid" only once a
+        LOAN_CLOSED event exists for the same loan_id.
+        """
+        events = scoring_data.get("credit_history") or []
+        wallet_address = scoring_data.get("wallet_address") or "unknown"
+
+        closed_timestamps_by_loan: Dict[str, int] = {}
+        for event in events:
+            if event.get("event_type") == CreditEventType.LOAN_CLOSED.value:
+                loan_id = event.get("loan_id")
+                if loan_id:
+                    closed_timestamps_by_loan[loan_id] = self._event_epoch_seconds(
+                        event.get("event_date")
+                    )
+
+        records = []
+        for event in events:
+            event_type = event.get("event_type")
+            timestamp = self._event_epoch_seconds(event.get("event_date"))
+            amount = float(event.get("amount") or 0)
+            score_impact = event.get("score_change") or 0
+            loan_id = event.get("loan_id")
+
+            if event_type == CreditEventType.LOAN_DISBURSEMENT.value:
+                record_type = "loan"
+                repayment_timestamp = closed_timestamps_by_loan.get(loan_id, 0)
+                repaid = repayment_timestamp > 0
+            elif event_type == CreditEventType.LOAN_CLOSED.value:
+                record_type = "loan"
+                repaid = True
+                repayment_timestamp = timestamp
+            elif event_type == CreditEventType.PAYMENT_MADE.value:
+                record_type = "payment"
+                repaid = True
+                repayment_timestamp = timestamp
+            elif event_type in (
+                CreditEventType.PAYMENT_MISSED.value,
+                CreditEventType.PAYMENT_LATE.value,
+            ):
+                record_type = "payment"
+                repaid = False
+                repayment_timestamp = 0
+            else:
+                # Applications, inquiries, account open/close, etc. still
+                # count toward history length/context but aren't loans.
+                record_type = "other"
+                repaid = False
+                repayment_timestamp = 0
+
+            records.append(
+                {
+                    "timestamp": timestamp,
+                    "amount": amount,
+                    "repaid": repaid,
+                    "repaymentTimestamp": repayment_timestamp,
+                    "provider": wallet_address,
+                    "recordType": record_type,
+                    "scoreImpact": score_impact,
+                }
+            )
+        return records
+
+    @staticmethod
+    def _extract_local_model_features(
+        history_records: List[Dict[str, Any]],
+    ) -> Dict[str, float]:
+        """Re-derive the model's flat feature vector locally, mirroring
+        code/ai_models/model_integration.py:transform_blockchain_data. Used
+        only for the local-joblib fallback so it produces the same features
+        the model was trained on (income, debt_ratio, payment_history,
+        loan_count, loan_amount, age, credit_utilization) instead of the
+        raw scoring_data dict.
+
+        Keep this in sync with ai_models/model_integration.py if that
+        function's feature engineering ever changes.
+        """
+        total_records = len(history_records)
+        loan_count = 0
+        total_borrowed = 0.0
+        repaid_count = 0
+        repayment_times = []
+        for record in history_records:
+            if record["recordType"] == "loan":
+                loan_count += 1
+                total_borrowed += float(record["amount"])
+            if record["repaid"]:
+                repaid_count += 1
+                if record["repaymentTimestamp"] > 0:
+                    days_to_repay = (
+                        record["repaymentTimestamp"] - record["timestamp"]
+                    ) / (60 * 60 * 24)
+                    repayment_times.append(days_to_repay)
+        payment_history = repaid_count / total_records if total_records > 0 else 0
+        avg_loan = total_borrowed / loan_count if loan_count > 0 else 0
+        income_proxy = avg_loan * 10
+        active_debt = (
+            total_borrowed - repaid_count / total_records * total_borrowed
+            if total_records > 0
+            else 0
+        )
+        debt_ratio = min(active_debt / income_proxy, 1.0) if income_proxy > 0 else 0.5
+        avg_repayment_time = (
+            sum(repayment_times) / len(repayment_times) if repayment_times else 30
+        )
+        credit_utilization = min(avg_repayment_time / 90, 1.0)
+        return {
+            "income": income_proxy,
+            "debt_ratio": debt_ratio,
+            "payment_history": payment_history,
+            "loan_count": loan_count,
+            "loan_amount": avg_loan,
+            "age": 30,
+            "credit_utilization": credit_utilization,
+        }
 
     def _check_score_alerts(self, user_id: str, new_score: int, old_score: int) -> None:
         """Check if score change warrants an alert"""

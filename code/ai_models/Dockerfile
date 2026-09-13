@@ -18,6 +18,13 @@ RUN pip install --no-cache-dir --upgrade pip && \
 
 COPY . .
 
+# Bake a trained model into the image at build time so the service never
+# silently runs on the rule-based fallback in model_integration.py just
+# because no one manually ran train_model.py first. Safe to re-run on every
+# build: train_model.py always regenerates credit_scoring_model.pkl from
+# fresh synthetic data (see its docstring for real-data training).
+RUN python train_model.py
+
 RUN addgroup --system appgroup && \
     adduser --system --ingroup appgroup appuser && \
     chown -R appuser:appgroup /app

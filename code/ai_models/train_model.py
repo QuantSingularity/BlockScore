@@ -106,10 +106,15 @@ def save_model(model: Any, output_path: Any) -> Any:
 
 
 def main() -> Any:
-    os.makedirs("../ai_models", exist_ok=True)
+    # Anchor output paths to this file's own directory rather than the
+    # current working directory, so `python train_model.py` produces
+    # consistent results regardless of where it's invoked from (previously
+    # "../ai_models" assumed the caller's cwd was itself inside a sibling
+    # directory of ai_models, which is only true by coincidence).
+    output_dir = os.path.dirname(os.path.abspath(__file__))
     logger.info("Generating synthetic financial data...")
     data = generate_synthetic_data(n_samples=5000)
-    data_path = "../ai_models/financial_data.csv"
+    data_path = os.path.join(output_dir, "financial_data.csv")
     data.to_csv(data_path, index=False)
     logger.info(f"Data saved to {data_path}")
     logger.info("Preprocessing data...")
@@ -118,7 +123,7 @@ def main() -> Any:
     model = train_model(X_train, y_train)
     logger.info("Evaluating model performance...")
     evaluate_model(model, X_test, y_test)
-    model_path = "../ai_models/credit_scoring_model.pkl"
+    model_path = os.path.join(output_dir, "credit_scoring_model.pkl")
     save_model(model, model_path)
     logger.info("Model training complete!")
 

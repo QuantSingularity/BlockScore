@@ -92,6 +92,11 @@ def create_app(config_name: Any = "default") -> Flask:
     auth_service = AuthService(db, bcrypt, redis_client)
     credit_service = CreditScoringService(db)
     blockchain_service = BlockchainService(app.config)
+    # Without this, CreditScoringService.blockchain_service stays None (its
+    # __init__ default) and calculate_credit_score's on-chain score
+    # submission is silently skipped for every request, even when wallet
+    # addresses are provided.
+    credit_service.blockchain_service = blockchain_service
     audit_service = AuditService(db)
     ComplianceService(db)
     blacklisted_tokens: set = set()
@@ -299,7 +304,12 @@ def create_app(config_name: Any = "default") -> Flask:
                         ),
                         "blockchain": "up" if blockchain_status else "down",
                         "ai_model": (
-                            "up" if credit_service.is_model_loaded() else "down"
+                            "up"
+                            if (
+                                credit_service.is_ai_service_available()
+                                or credit_service.is_model_loaded()
+                            )
+                            else "down"
                         ),
                     },
                     "request_id": getattr(g, "request_id", None),
