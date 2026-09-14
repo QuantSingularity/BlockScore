@@ -28,7 +28,7 @@ BlockScore is a credit scoring platform: a Flask backend for auth, credit scorin
 
 ## Overview
 
-BlockScore demonstrates a credit-scoring workflow across a real, runnable codebase. The live Flask backend, Hardhat smart contracts, and both frontends are wired and covered by tests. `code/ai_models` also contains its own separate Flask server for model serving, but the main backend doesn't call it over HTTP; it loads the same trained model file directly from disk instead. A handful of standalone Node.js modules (a web3.js contract service, a JWT auth service) exist in `code/backend` but, per that directory's own `package.json`, aren't wired into any server.
+BlockScore demonstrates a credit-scoring workflow across a real, runnable codebase. The live Flask backend, Hardhat smart contracts, the `code/ai_models` scoring service, and both frontends are wired and covered by tests. The Flask backend calls `code/ai_models`'s Flask API over HTTP (via `AI_MODEL_URL`) to score credit history, falling back to a locally loaded copy of the trained model, and then to the rule-based engine, if that service is unreachable.
 
 ## Project Structure
 
@@ -45,7 +45,7 @@ BlockScore/
 │   │   ├── contracts/          # CreditScore(V2), LoanContract(V2), GovernanceToken
 │   │   └── tests/              # Hardhat test suite
 │   └── ai_models/              # Credit-scoring model training and its own Flask
-│                               # serving API (not called by code/backend)
+│                               # serving API, called by code/backend over HTTP
 ├── web-frontend/               # React (Vite) dashboard
 ├── mobile-frontend/            # React Native app
 ├── infrastructure/             # Docker, Kubernetes, Terraform, Ansible, monitoring
@@ -58,22 +58,16 @@ BlockScore/
 
 ### Application tier (wired and tested)
 
-| Component           | Details                                                                                                                                                                                                                                                                                                                                                         |
-| :------------------ | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **API**             | A Flask application with all routes defined directly in `app.py`: health, auth (register, login, logout, refresh), credit (score calculation, history), loans (apply, calculate, list, anchor to blockchain), and profile.                                                                                                                                      |
-| **Auth**            | JWT sessions with bcrypt password hashing, plus a real MFA service. `SECRET_KEY` and `JWT_SECRET_KEY` both fall back to static placeholder values with no check that rejects them in production.                                                                                                                                                                |
-| **Credit scoring**  | A multi-factor rule-based engine computing payment history, credit utilization, length of history, credit mix, new credit, income stability, and debt-to-income factors, combined into a score. If a trained model file (`credit_scoring_model.pkl`) is present, it's loaded and used; otherwise the service falls back to the rule-based engine automatically. |
-| **Background jobs** | A real Celery app (`utils/background_jobs.py`), backed by Redis and run through its own `celery_worker` container in Docker Compose.                                                                                                                                                                                                                            |
-| **Smart contracts** | Hardhat-managed Solidity contracts: `CreditScore` and `CreditScoreV2`, `LoanContract` and `LoanContractV2`, and a `GovernanceToken`, read and written via a genuine web3.py-backed blockchain service.                                                                                                                                                          |
-| **Web dashboard**   | React app (plain JavaScript, Vite, Material-UI, Chart.js) covering the dashboard, credit score, loans, profile, and authentication screens.                                                                                                                                                                                                                     |
-| **Mobile app**      | React Native app (TypeScript) covering Dashboard, Login, Profile, and Register screens, with Redux Toolkit for state, React Navigation, and React Native Elements (`@rneui`) for UI components.                                                                                                                                                                 |
-
-### Standalone modules (not called by the live backend)
-
-| Component                         | Details                                                                                                                                                                                                                                                                   |
-| :-------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **AI model training and serving** | `code/ai_models` has its own training script and a separate Flask API for model inference; `code/backend` loads the trained `.pkl` file directly from disk rather than calling this API over HTTP.                                                                        |
-| **Node.js service modules**       | `services/contractService.js` (web3.js), `services/authService.js`, and `middleware/auth.js` in `code/backend` are real, installable modules, but per that directory's own `package.json`, there is no `app.js` or `routes/` directory wiring them into a running server. |
+| Component            | Details                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| :------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **API**              | A Flask application with all routes defined directly in `app.py`: health, auth (register, login, logout, refresh), credit (score calculation, history), loans (apply, calculate, list, anchor to blockchain), and profile.                                                                                                                                                                                                      |
+| **Auth**             | JWT sessions with bcrypt password hashing, plus a real MFA service. `SECRET_KEY` and `JWT_SECRET_KEY` both fall back to static placeholder values with no check that rejects them in production.                                                                                                                                                                                                                                |
+| **Credit scoring**   | A multi-factor rule-based engine computing payment history, credit utilization, length of history, credit mix, new credit, income stability, and debt-to-income factors, combined into a score. Also calls the `code/ai_models` Flask service over HTTP (`AI_MODEL_URL`) for a model-based score, falling back to a locally loaded `credit_scoring_model.pkl` and then to the rule-based engine if that service is unreachable. |
+| **Background jobs**  | A real Celery app (`utils/background_jobs.py`), backed by Redis and run through its own `celery_worker` container in Docker Compose.                                                                                                                                                                                                                                                                                            |
+| **AI model service** | `code/ai_models` is a separate Flask API (its own Dockerfile and `ai_model` service in `docker-compose.yml`) for training and serving the credit-scoring model; `code/backend` calls it over HTTP for live scoring.                                                                                                                                                                                                             |
+| **Smart contracts**  | Hardhat-managed Solidity contracts: `CreditScore` and `CreditScoreV2`, `LoanContract` and `LoanContractV2`, and a `GovernanceToken`, read and written via a genuine web3.py-backed blockchain service.                                                                                                                                                                                                                          |
+| **Web dashboard**    | React app (plain JavaScript, Vite, Material-UI, Chart.js) covering the dashboard, credit score, loans, profile, and authentication screens.                                                                                                                                                                                                                                                                                     |
+| **Mobile app**       | React Native app (TypeScript) covering Dashboard, Login, Profile, and Register screens, with Redux Toolkit for state, React Navigation, and React Native Elements (`@rneui`) for UI components.                                                                                                                                                                                                                                 |
 
 ## Technology Stack
 
@@ -109,9 +103,10 @@ Backend (Flask, all routes in app.py)
 Blockchain (Hardhat / Solidity)
   CreditScore · CreditScoreV2 · LoanContract · LoanContractV2 · GovernanceToken
 
-AI model service (code/ai_models, standalone)
-  Training script + its own Flask serving API; code/backend reads the trained
-  .pkl file directly from disk rather than calling this API
+AI model service (code/ai_models)
+  Training script + Flask serving API; code/backend calls it over HTTP
+  (AI_MODEL_URL), falling back to a local .pkl file and then rule-based
+  scoring if the service is unreachable
 ```
 
 See [docs/architecture.md](docs/architecture.md) for detail.

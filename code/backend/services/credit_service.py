@@ -56,11 +56,6 @@ class CreditScoringService:
         self.min_score = 300
         self.max_score = 850
         self.default_score = 300
-        # HTTP endpoint for the code/ai_models scoring microservice (see
-        # code/docker-compose.yml, which points this at the "ai_model"
-        # container). Falls back to the conventional local port so the
-        # service also works when ai_models/server.py is run standalone
-        # outside of docker-compose.
         self.ai_model_url = os.getenv("AI_MODEL_URL", "http://localhost:5001").rstrip(
             "/"
         )
@@ -283,8 +278,7 @@ class CreditScoringService:
         return self.model is not None
 
     def is_ai_service_available(self) -> bool:
-        """Check whether the code/ai_models HTTP scoring service is
-        reachable, for health checks (see /api/health in app.py)."""
+        """Check whether the ai_models HTTP scoring service is reachable"""
         try:
             response = requests.get(f"{self.ai_model_url}/health", timeout=2)
             return response.status_code == 200
@@ -292,30 +286,12 @@ class CreditScoringService:
             return False
 
     def _load_model(self) -> Any:
-        """Load a local copy of the AI model as a same-process fallback.
-
-        The primary integration path is the code/ai_models HTTP service
-        (see _call_ai_model / _request_ai_prediction below). This local
-        joblib model is only used if that service can't be reached, and
-        only when code/ai_models/credit_scoring_model.pkl happens to be
-        available on disk next to code/backend (e.g. running the backend
-        directly out of a full monorepo checkout). It is never required -
-        joblib/pandas are optional dependencies for the backend and
-        _call_ai_model degrades to rule-based scoring if neither the
-        service nor this local model is available.
-        """
+        """Load a local copy of the AI model as a same-process fallback"""
         if not _JOBLIB_AVAILABLE:
-            self.logger.info(
-                "joblib not installed; local AI model fallback disabled "
-                "(the ai_models HTTP service and rule-based scoring are "
-                "still available)."
-            )
+            self.logger.info("joblib not installed; local AI model fallback disabled.")
             self.model = None
             return
         try:
-            # __file__ is code/backend/services/credit_service.py, so this
-            # needs to climb three levels (services -> backend -> code)
-            # before descending into the ai_models sibling directory.
             model_path = os.path.join(
                 os.path.dirname(
                     os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -1206,21 +1182,7 @@ class CreditScoringService:
             return False
 
     def _call_ai_model(self, features: Dict[str, Any]) -> Dict[str, Any]:
-        """Score a user via the code/ai_models scoring service.
-
-        `features` is the dict produced by _gather_scoring_data (user_id,
-        wallet_address, profile_data, credit_history, blockchain_data,
-        financial_data). This method:
-
-        1. Converts the on-file credit_history events into the record
-           shape the ai_models service expects (see _build_ai_history_records
-           and code/ai_models/model_integration.py:transform_blockchain_data).
-        2. POSTs them to the ai_models /predict endpoint (AI_MODEL_URL).
-        3. Falls back to a local joblib model if the service is unreachable.
-        4. Falls back to a neutral default score if neither is available.
-
-        Patchable in tests via unittest.mock.patch.object(service, "_call_ai_model").
-        """
+        """Score a user via the ai_models service, with local/rule-based fallbacks"""
         history_records = self._build_ai_history_records(features)
 
         ai_response = self._request_ai_prediction(history_records)
@@ -1242,13 +1204,7 @@ class CreditScoringService:
     def _request_ai_prediction(
         self, history_records: List[Dict[str, Any]]
     ) -> Optional[Dict[str, Any]]:
-        """POST credit history to the ai_models /predict endpoint.
-
-        Returns None (rather than raising) on any network error, timeout,
-        or malformed response so callers can fall back cleanly - the AI
-        model service is a best-effort enhancement, never a hard
-        dependency for producing a credit score.
-        """
+        """POST credit history to the ai_models /predict endpoint"""
         if not history_records:
             return None
         try:
@@ -1280,9 +1236,7 @@ class CreditScoringService:
 
     @staticmethod
     def _event_epoch_seconds(value: Any) -> int:
-        """Convert a CreditHistory event_date (datetime, possibly naive) to
-        a Unix timestamp, matching the epoch-seconds format ai_models
-        expects for "timestamp"/"repaymentTimestamp"."""
+        """Convert an event_date to a Unix timestamp"""
         if isinstance(value, datetime):
             if value.tzinfo is None:
                 value = value.replace(tzinfo=timezone.utc)
@@ -1292,16 +1246,7 @@ class CreditScoringService:
     def _build_ai_history_records(
         self, scoring_data: Dict[str, Any]
     ) -> List[Dict[str, Any]]:
-        """Translate internal CreditHistory events into the record shape the
-        ai_models service consumes: {timestamp, amount, repaid,
-        repaymentTimestamp, provider, recordType, scoreImpact}
-        (see code/ai_models/model_integration.py:transform_blockchain_data).
-
-        Loan lifecycle events are matched heuristically since CreditHistory
-        doesn't currently track a strict disbursement/closure link beyond
-        the shared loan_id: a LOAN_DISBURSEMENT is "repaid" only once a
-        LOAN_CLOSED event exists for the same loan_id.
-        """
+        """Translate CreditHistory events into ai_models record format"""
         events = scoring_data.get("credit_history") or []
         wallet_address = scoring_data.get("wallet_address") or "unknown"
 
@@ -1342,8 +1287,6 @@ class CreditScoringService:
                 repaid = False
                 repayment_timestamp = 0
             else:
-                # Applications, inquiries, account open/close, etc. still
-                # count toward history length/context but aren't loans.
                 record_type = "other"
                 repaid = False
                 repayment_timestamp = 0
@@ -1365,16 +1308,7 @@ class CreditScoringService:
     def _extract_local_model_features(
         history_records: List[Dict[str, Any]],
     ) -> Dict[str, float]:
-        """Re-derive the model's flat feature vector locally, mirroring
-        code/ai_models/model_integration.py:transform_blockchain_data. Used
-        only for the local-joblib fallback so it produces the same features
-        the model was trained on (income, debt_ratio, payment_history,
-        loan_count, loan_amount, age, credit_utilization) instead of the
-        raw scoring_data dict.
-
-        Keep this in sync with ai_models/model_integration.py if that
-        function's feature engineering ever changes.
-        """
+        """Re-derive the model's feature vector for the local-model fallback"""
         total_records = len(history_records)
         loan_count = 0
         total_borrowed = 0.0

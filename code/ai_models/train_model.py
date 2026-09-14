@@ -106,11 +106,6 @@ def save_model(model: Any, output_path: Any) -> Any:
 
 
 def main() -> Any:
-    # Anchor output paths to this file's own directory rather than the
-    # current working directory, so `python train_model.py` produces
-    # consistent results regardless of where it's invoked from (previously
-    # "../ai_models" assumed the caller's cwd was itself inside a sibling
-    # directory of ai_models, which is only true by coincidence).
     output_dir = os.path.dirname(os.path.abspath(__file__))
     logger.info("Generating synthetic financial data...")
     data = generate_synthetic_data(n_samples=5000)

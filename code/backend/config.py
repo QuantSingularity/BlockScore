@@ -82,8 +82,6 @@ class Config:
     RATELIMIT_STORAGE_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
     RATELIMIT_DEFAULT = os.getenv("RATE_LIMIT_DEFAULT", "100 per hour")
     RATELIMIT_LOGIN = os.getenv("RATE_LIMIT_LOGIN", "5 per minute")
-    # code/ai_models scoring microservice (see code/docker-compose.yml's
-    # "ai_model" service and services/credit_service.py:_call_ai_model).
     AI_MODEL_URL = os.getenv("AI_MODEL_URL", "http://localhost:5001")
     AI_MODEL_TIMEOUT = float(os.getenv("AI_MODEL_TIMEOUT", "5"))
     CREDIT_BUREAU_API_KEY = os.getenv("CREDIT_BUREAU_API_KEY", "")

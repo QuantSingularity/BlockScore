@@ -92,10 +92,6 @@ def create_app(config_name: Any = "default") -> Flask:
     auth_service = AuthService(db, bcrypt, redis_client)
     credit_service = CreditScoringService(db)
     blockchain_service = BlockchainService(app.config)
-    # Without this, CreditScoringService.blockchain_service stays None (its
-    # __init__ default) and calculate_credit_score's on-chain score
-    # submission is silently skipped for every request, even when wallet
-    # addresses are provided.
     credit_service.blockchain_service = blockchain_service
     audit_service = AuditService(db)
     ComplianceService(db)
