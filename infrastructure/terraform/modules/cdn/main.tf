@@ -63,7 +63,7 @@ resource "aws_cloudfront_distribution" "main" {
     compress               = true
   }
 
-  # Cache behavior for API endpoints — bypass cache
+  # Cache behavior for API endpoints - bypass cache
   ordered_cache_behavior {
     path_pattern     = "/api/*"
     allowed_methods  = ["DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"]

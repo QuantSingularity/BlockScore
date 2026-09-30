@@ -25,7 +25,7 @@ provider "aws" {
   }
 }
 
-# Separate provider for us-east-1 — WAF for CloudFront must be in us-east-1
+# Separate provider for us-east-1 - WAF for CloudFront must be in us-east-1
 provider "aws" {
   alias  = "us_east_1"
   region = "us-east-1"

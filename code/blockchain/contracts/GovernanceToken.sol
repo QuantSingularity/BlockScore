@@ -146,7 +146,7 @@ contract GovernanceToken is
         // Ensure the funding admin actually has enough tokens to seed this
         // vesting schedule. (Previously this checked the contract's own
         // balance instead of the caller's, before the tokens were ever
-        // transferred in — which made this requirement impossible to
+        // transferred in - which made this requirement impossible to
         // satisfy on a fresh vesting schedule and broke the feature.)
         require(
             balanceOf(msg.sender) >= totalAmount,
