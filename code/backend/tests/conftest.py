@@ -1,7 +1,3 @@
-"""
-Pytest configuration and shared fixtures for BlockScore Backend tests
-"""
-
 import os
 import sys
 import tempfile
@@ -33,12 +29,9 @@ try:
 except ImportError:
     _has_redis = False
 
-# ── Session-scoped app & context ────────────────────────────────────────────
-
 
 @pytest.fixture(scope="session")
 def app() -> Any:
-    """Create application for the entire test session."""
     db_fd, db_path = tempfile.mkstemp(suffix=".db")
     os.environ["FLASK_ENV"] = "testing"
     os.environ["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{db_path}"
@@ -73,13 +66,6 @@ def app() -> Any:
 
 @pytest.fixture(scope="session", autouse=True)
 def _push_app_context() -> Any:
-    """
-    Keep an app context alive for the whole session.
-    This is needed so that Mock(spec=SomeModel) can introspect SQLAlchemy
-    descriptors (like .query) without raising RuntimeError.
-    We build a minimal app here independently so we don't clash with any
-    function-scoped local `app` fixtures in individual test files.
-    """
     import tempfile
 
     _app = create_app("testing")
@@ -105,17 +91,8 @@ def _push_app_context() -> Any:
         pass
 
 
-# ── Per-test DB isolation ────────────────────────────────────────────────────
-
-
 @pytest.fixture(scope="function")
 def db(app: Any) -> Any:
-    """
-    Provide a clean database for each test.
-    All rows are deleted after each test so the UNIQUE constraints are never
-    violated across tests.
-    """
-    # app context is already active from the session fixture
     _db.create_all()
     yield _db
     _db.session.remove()
@@ -129,22 +106,16 @@ def db(app: Any) -> Any:
 
 @pytest.fixture(scope="function")
 def client(app: Any) -> Any:
-    """Create test client."""
     return app.test_client()
 
 
 @pytest.fixture(scope="function")
 def runner(app: Any) -> Any:
-    """Create test CLI runner."""
     return app.test_cli_runner()
-
-
-# ── Mock helpers ─────────────────────────────────────────────────────────────
 
 
 @pytest.fixture
 def mock_redis() -> Any:
-    """Mock Redis client."""
     mock_client = Mock()
     mock_client.ping.return_value = True
     mock_client.get.return_value = None
@@ -163,22 +134,16 @@ def mock_redis() -> Any:
 
 @pytest.fixture
 def cache_manager(mock_redis: Any) -> Any:
-    """Create cache manager with mock Redis."""
     return CacheManager(redis_client=mock_redis)
 
 
 @pytest.fixture
 def performance_monitor() -> Any:
-    """Create performance monitor."""
     return PerformanceMonitor(retention_hours=1)
-
-
-# ── Sample data helpers ───────────────────────────────────────────────────────
 
 
 @pytest.fixture
 def sample_user_data() -> Any:
-    """Sample user registration data."""
     return {
         "email": "test@example.com",
         "password": "TestPassword123!",
@@ -196,7 +161,6 @@ def sample_user_data() -> Any:
 
 @pytest.fixture
 def sample_user(db: Any, sample_user_data: Any) -> Any:
-    """Create a sample active user in the database."""
     from flask_bcrypt import generate_password_hash
 
     email = sample_user_data.get("email", "test@example.com")
@@ -237,7 +201,6 @@ def sample_user(db: Any, sample_user_data: Any) -> Any:
 
 @pytest.fixture
 def sample_credit_score(db: Any, sample_user: Any) -> Any:
-    """Create a sample credit score linked to sample_user."""
     credit_score = CreditScore(
         user_id=sample_user.id,
         score=750,
@@ -254,7 +217,6 @@ def sample_credit_score(db: Any, sample_user: Any) -> Any:
 
 @pytest.fixture
 def sample_loan_application(db: Any, sample_user: Any) -> Any:
-    """Create a sample loan application linked to sample_user."""
     loan_app = LoanApplication(
         user_id=sample_user.id,
         application_number=LoanApplication.generate_application_number(),
@@ -273,12 +235,8 @@ def sample_loan_application(db: Any, sample_user: Any) -> Any:
     return loan_app
 
 
-# ── Service fixtures ──────────────────────────────────────────────────────────
-
-
 @pytest.fixture
 def auth_service(db: Any, app: Any) -> Any:
-    """Authentication service backed by test DB."""
     from extensions import bcrypt
 
     return AuthenticationService(db, bcrypt)
@@ -286,13 +244,11 @@ def auth_service(db: Any, app: Any) -> Any:
 
 @pytest.fixture
 def credit_service(db: Any, mock_redis: Any, app: Any) -> Any:
-    """Credit scoring service backed by test DB."""
     from unittest.mock import Mock
 
     svc = CreditScoringService(db)
-    # Provide a mock cache so cache-related tests can patch it
     mock_cache = Mock()
-    mock_cache.get.return_value = None  # default: cache miss
+    mock_cache.get.return_value = None
     mock_cache.set.return_value = True
     svc.cache = mock_cache
     return svc
@@ -300,13 +256,11 @@ def credit_service(db: Any, mock_redis: Any, app: Any) -> Any:
 
 @pytest.fixture
 def compliance_service(db: Any) -> Any:
-    """Compliance service backed by test DB."""
     return ComplianceService(db)
 
 
 @pytest.fixture
 def mock_blockchain_config() -> Any:
-    """Minimal blockchain config for tests."""
     return {
         "BLOCKCHAIN_PROVIDER_URL": "http://localhost:8545",
         "BLOCKCHAIN_FROM_ADDRESS": "0x1234567890123456789012345678901234567890",
@@ -320,20 +274,15 @@ def mock_blockchain_config() -> Any:
 
 @pytest.fixture
 def blockchain_service(mock_blockchain_config: Any) -> Any:
-    """Blockchain service with mocked web3."""
     service = BlockchainService(mock_blockchain_config)
     service.web3 = Mock()
     service.is_connected_flag = True
     return service
 
 
-# ── Utility helpers ────────────────────────────────────────────────────────────
-
-
 def create_test_audit_log(
     db: Any, user_id: Any, event_type: Any = None, severity: Any = None
 ) -> Any:
-    """Create a test audit log entry."""
     event_type = event_type or AuditEventType.USER_LOGIN
     severity = severity or AuditSeverity.LOW
     if isinstance(event_type, str):
@@ -362,7 +311,6 @@ def create_test_audit_log(
 
 
 def pytest_configure(config: Any) -> Any:
-    """Register custom markers."""
     config.addinivalue_line("markers", "unit: mark test as a unit test")
     config.addinivalue_line("markers", "integration: mark test as an integration test")
     config.addinivalue_line("markers", "slow: mark test as slow running")

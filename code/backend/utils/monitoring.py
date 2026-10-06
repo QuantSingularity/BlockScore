@@ -1,8 +1,3 @@
-"""
-Performance Monitoring for BlockScore Backend
-Real-time performance monitoring and alerting
-"""
-
 import logging
 import threading
 import time
@@ -23,7 +18,6 @@ except ImportError:
 
 @dataclass
 class MetricPoint:
-    """Single metric data point"""
 
     timestamp: datetime
     value: float
@@ -38,7 +32,6 @@ class MetricPoint:
 
 
 class PerformanceMonitor:
-    """Real-time performance monitoring system"""
 
     def __init__(self, retention_hours: int = 24) -> None:
         self.retention_hours = retention_hours
@@ -62,7 +55,6 @@ class PerformanceMonitor:
     def record_metric(
         self, name: str, value: float, tags: Dict[str, str] = None
     ) -> Any:
-        """Record a metric value"""
         try:
             point = MetricPoint(
                 timestamp=datetime.now(timezone.utc), value=value, tags=tags
@@ -81,7 +73,6 @@ class PerformanceMonitor:
         response_time_ms: float,
         user_id: str = None,
     ) -> Any:
-        """Record HTTP request metrics"""
         tags = {
             "endpoint": endpoint,
             "method": method,
@@ -106,7 +97,6 @@ class PerformanceMonitor:
         execution_time_ms: float,
         rows_affected: int = 0,
     ) -> Any:
-        """Record database query metrics"""
         tags = {"query_type": query_type, "table": table}
         self.record_metric("db_query_duration_ms", execution_time_ms, tags)
         self.record_metric("db_query_total", 1, tags)
@@ -116,7 +106,6 @@ class PerformanceMonitor:
     def record_cache_operation(
         self, operation: str, hit: bool, execution_time_ms: float = None
     ) -> Any:
-        """Record cache operation metrics"""
         tags = {"operation": operation, "result": "hit" if hit else "miss"}
         self.record_metric("cache_operations_total", 1, tags)
         if execution_time_ms is not None:
@@ -125,7 +114,6 @@ class PerformanceMonitor:
     def record_business_metric(
         self, metric_name: str, value: float, tags: Dict[str, str] = None
     ) -> Any:
-        """Record business-specific metrics"""
         business_tags = {"category": "business"}
         if tags:
             business_tags.update(tags)
@@ -138,7 +126,6 @@ class PerformanceMonitor:
         end_time: datetime = None,
         tags: Dict[str, str] = None,
     ) -> List[Dict[str, Any]]:
-        """Get metric values within time range"""
         try:
             if name not in self.metrics:
                 return []
@@ -168,7 +155,6 @@ class PerformanceMonitor:
     def get_metric_summary(
         self, name: str, start_time: datetime = None, end_time: datetime = None
     ) -> Dict[str, Any]:
-        """Get metric summary statistics"""
         try:
             points = self.get_metrics(name, start_time, end_time)
             if not points:
@@ -188,7 +174,6 @@ class PerformanceMonitor:
             return {"error": str(e)}
 
     def get_system_metrics(self) -> Dict[str, Any]:
-        """Get current system metrics"""
         if not _PSUTIL_AVAILABLE:
             return {
                 "cpu": {},
@@ -235,7 +220,6 @@ class PerformanceMonitor:
             return {"error": str(e)}
 
     def get_application_metrics(self) -> Dict[str, Any]:
-        """Get application-specific metrics"""
         try:
             response_time_stats = {}
             for endpoint, times in self.response_times.items():
@@ -284,7 +268,6 @@ class PerformanceMonitor:
         tags: Dict[str, str] = None,
         callback: Callable = None,
     ) -> Any:
-        """Add alert rule for metric"""
         self.alert_rules[name] = {
             "metric_name": metric_name,
             "threshold": threshold,
@@ -296,7 +279,6 @@ class PerformanceMonitor:
         self.logger.info(f"Alert rule added: {name}")
 
     def get_active_alerts(self) -> List[Dict[str, Any]]:
-        """Get currently active alerts"""
         cutoff_time = datetime.now(timezone.utc) - timedelta(hours=1)
         active_alerts = [
             alert for alert in self.alerts if alert["timestamp"] > cutoff_time
@@ -304,7 +286,6 @@ class PerformanceMonitor:
         return active_alerts
 
     def get_health_status(self) -> Dict[str, Any]:
-        """Get overall system health status"""
         try:
             system_metrics = self.get_system_metrics()
             app_metrics = self.get_application_metrics()
@@ -384,7 +365,6 @@ class PerformanceMonitor:
     def _check_alerts(
         self, metric_name: str, value: float, tags: Dict[str, str] = None
     ) -> Any:
-        """Check if metric value triggers any alerts"""
         for alert_name, rule in self.alert_rules.items():
             if rule["metric_name"] != metric_name:
                 continue
@@ -427,7 +407,6 @@ class PerformanceMonitor:
                         )
 
     def _cleanup_old_metrics(self, metric_name: str) -> Any:
-        """Remove old metric points"""
         if metric_name not in self.metrics:
             return
         cutoff_time = datetime.now(timezone.utc) - timedelta(hours=self.retention_hours)
@@ -436,7 +415,6 @@ class PerformanceMonitor:
             points.popleft()
 
     def _start_system_monitoring(self) -> Any:
-        """Start background system monitoring"""
 
         def monitor_system():
             while self.system_metrics_enabled:
@@ -480,11 +458,9 @@ class PerformanceMonitor:
         monitor_thread.start()
 
     def stop_monitoring(self) -> None:
-        """Stop system monitoring"""
         self.system_metrics_enabled = False
 
     def reset_metrics(self) -> Any:
-        """Reset all metrics and counters"""
         self.metrics.clear()
         self.alerts.clear()
         self.request_counts.clear()
@@ -494,7 +470,6 @@ class PerformanceMonitor:
 
 
 def monitor_performance(monitor: PerformanceMonitor, metric_prefix: str = "") -> Any:
-    """Decorator to monitor function performance"""
 
     def decorator(func):
 
@@ -556,7 +531,6 @@ def monitor_performance(monitor: PerformanceMonitor, metric_prefix: str = "") ->
 
 
 def monitor_database_query(monitor: PerformanceMonitor) -> Any:
-    """Decorator to monitor database queries"""
 
     def decorator(func):
 

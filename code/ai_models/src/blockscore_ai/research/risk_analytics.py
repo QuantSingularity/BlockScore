@@ -1,27 +1,48 @@
-"""
-Risk Analytics Module for Financial Institutions
-Comprehensive risk assessment, portfolio analysis, and regulatory reporting
-"""
-
+import json
 import logging
-import warnings
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Dict, List
 
 import numpy as np
 import pandas as pd
 import scipy.stats as stats
+from blockscore_ai.config import ARTIFACTS_DIR
 from scipy.stats import norm
 
-warnings.filterwarnings("ignore")
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+MIN_SCORE = 300.0
+MAX_SCORE = 850.0
+DEFAULT_PD = 0.02
+DEFAULT_LGD = 0.45
+TRADING_DAYS = 252
+
+
+def _now() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _json_default(value: Any) -> Any:
+    if isinstance(value, (np.integer,)):
+        return int(value)
+    if isinstance(value, (np.floating,)):
+        return None if np.isnan(value) or np.isinf(value) else float(value)
+    if isinstance(value, np.ndarray):
+        return value.tolist()
+    return str(value)
+
+
+def _exposure_column(df: pd.DataFrame) -> str:
+    if "exposure" in df.columns:
+        return "exposure"
+    if "loan_amount" in df.columns:
+        return "loan_amount"
+    return ""
 
 
 class RiskType(Enum):
-    """Risk type enumeration"""
 
     CREDIT = "credit"
     MARKET = "market"
@@ -32,7 +53,6 @@ class RiskType(Enum):
 
 
 class RiskLevel(Enum):
-    """Risk level enumeration"""
 
     LOW = "low"
     MEDIUM = "medium"
@@ -42,7 +62,6 @@ class RiskLevel(Enum):
 
 @dataclass
 class RiskMetrics:
-    """Risk metrics container"""
 
     var_95: float
     var_99: float
@@ -61,7 +80,6 @@ class RiskMetrics:
 
 @dataclass
 class PortfolioRisk:
-    """Portfolio risk assessment"""
 
     total_exposure: float
     diversification_ratio: float
@@ -74,9 +92,6 @@ class PortfolioRisk:
 
 
 class RiskAnalytics:
-    """
-    Comprehensive risk analytics for financial institutions
-    """
 
     def __init__(self) -> None:
         self.risk_models = {}
@@ -98,7 +113,6 @@ class RiskAnalytics:
         }
 
     def load_portfolio_data(self, portfolio_df: pd.DataFrame) -> None:
-        """Load portfolio data for risk analysis"""
         self.portfolio_data = portfolio_df.copy()
         logger.info(f"Loaded portfolio data with {len(portfolio_df)} positions")
         required_cols = [
@@ -113,14 +127,12 @@ class RiskAnalytics:
             logger.warning(f"Missing required columns: {missing_cols}")
 
     def load_market_data(self, market_df: pd.DataFrame) -> None:
-        """Load market data for risk calculations"""
         self.market_data = market_df.copy()
         logger.info(f"Loaded market data with {len(market_df)} observations")
         if "returns" not in market_df.columns and "price" in market_df.columns:
             self.market_data["returns"] = market_df["price"].pct_change()
 
     def load_credit_data(self, credit_df: pd.DataFrame) -> None:
-        """Load credit data for credit risk analysis"""
         self.credit_data = credit_df.copy()
         logger.info(f"Loaded credit data with {len(credit_df)} borrowers")
 
@@ -130,9 +142,6 @@ class RiskAnalytics:
         confidence_level: float = 0.95,
         method: str = "historical",
     ) -> float:
-        """
-        Calculate Value at Risk (VaR) using different methods
-        """
         if method == "historical":
             return self._historical_var(returns, confidence_level)
         elif method == "parametric":
@@ -143,11 +152,9 @@ class RiskAnalytics:
             raise ValueError(f"Unknown VaR method: {method}")
 
     def _historical_var(self, returns: pd.Series, confidence_level: float) -> float:
-        """Calculate historical VaR"""
         return np.percentile(returns.dropna(), (1 - confidence_level) * 100)
 
     def _parametric_var(self, returns: pd.Series, confidence_level: float) -> float:
-        """Calculate parametric VaR assuming normal distribution"""
         mean_return = returns.mean()
         std_return = returns.std()
         z_score = norm.ppf(1 - confidence_level)
@@ -156,23 +163,23 @@ class RiskAnalytics:
     def _monte_carlo_var(
         self, returns: pd.Series, confidence_level: float, n_simulations: int = 10000
     ) -> float:
-        """Calculate Monte Carlo VaR"""
         mean_return = returns.mean()
         std_return = returns.std()
-        simulated_returns = np.random.normal(mean_return, std_return, n_simulations)
+        generator = np.random.default_rng(42)
+        simulated_returns = generator.normal(mean_return, std_return, n_simulations)
         return np.percentile(simulated_returns, (1 - confidence_level) * 100)
 
     def calculate_expected_shortfall(
         self, returns: pd.Series, confidence_level: float = 0.95
     ) -> float:
-        """Calculate Expected Shortfall (Conditional VaR)"""
-        var = self._historical_var(returns, confidence_level)
-        return returns[returns <= var].mean()
+        clean = returns.dropna()
+        var = self._historical_var(clean, confidence_level)
+        tail = clean[clean <= var]
+        return float(tail.mean()) if len(tail) else float(var)
 
     def calculate_portfolio_risk_metrics(
         self, returns: pd.DataFrame, benchmark_returns: pd.Series = None
     ) -> RiskMetrics:
-        """Calculate comprehensive risk metrics for portfolio"""
         if "portfolio" not in returns.columns:
             portfolio_returns = returns.mean(axis=1)
         else:
@@ -185,15 +192,17 @@ class RiskAnalytics:
         running_max = cumulative_returns.expanding().max()
         drawdown = (cumulative_returns - running_max) / running_max
         max_drawdown = drawdown.min()
-        volatility = portfolio_returns.std() * np.sqrt(252)
-        mean_return = portfolio_returns.mean() * 252
+        volatility = portfolio_returns.std() * np.sqrt(TRADING_DAYS)
+        mean_return = portfolio_returns.mean() * TRADING_DAYS
         risk_free_rate = 0.02
-        sharpe_ratio = (mean_return - risk_free_rate) / volatility
+        sharpe_ratio = (
+            (mean_return - risk_free_rate) / volatility if volatility > 0 else np.nan
+        )
         downside_returns = portfolio_returns[portfolio_returns < 0]
-        downside_deviation = downside_returns.std() * np.sqrt(252)
+        downside_deviation = downside_returns.std() * np.sqrt(TRADING_DAYS)
         sortino_ratio = (
             (mean_return - risk_free_rate) / downside_deviation
-            if downside_deviation > 0
+            if downside_deviation and downside_deviation > 0
             else np.inf
         )
         calmar_ratio = mean_return / abs(max_drawdown) if max_drawdown != 0 else np.inf
@@ -201,12 +210,15 @@ class RiskAnalytics:
         kurtosis = portfolio_returns.kurtosis()
         beta, alpha = (None, None)
         if benchmark_returns is not None:
-            covariance = np.cov(portfolio_returns.dropna(), benchmark_returns.dropna())[
-                0, 1
-            ]
-            benchmark_variance = benchmark_returns.var()
-            beta = covariance / benchmark_variance
-            alpha = mean_return - beta * (benchmark_returns.mean() * 252)
+            aligned = pd.concat(
+                [portfolio_returns, benchmark_returns], axis=1, join="inner"
+            ).dropna()
+            if len(aligned) > 1 and aligned.iloc[:, 1].var() > 0:
+                beta = (
+                    aligned.iloc[:, 0].cov(aligned.iloc[:, 1])
+                    / aligned.iloc[:, 1].var()
+                )
+                alpha = mean_return - beta * (aligned.iloc[:, 1].mean() * TRADING_DAYS)
         return RiskMetrics(
             var_95=var_95,
             var_99=var_99,
@@ -224,8 +236,9 @@ class RiskAnalytics:
         )
 
     def analyze_concentration_risk(self, portfolio_df: pd.DataFrame) -> Dict[str, Any]:
-        """Analyze concentration risk in portfolio"""
         total_value = portfolio_df["market_value"].sum()
+        if total_value <= 0:
+            raise ValueError("Portfolio market value must be positive")
         position_weights = portfolio_df["market_value"] / total_value
         hhi = (position_weights**2).sum()
         top_10_concentration = position_weights.nlargest(10).sum()
@@ -234,13 +247,13 @@ class RiskAnalytics:
         )
         sector_hhi = (sector_concentration**2).sum()
         geographic_concentration = {}
+        geo_hhi = None
         if "country" in portfolio_df.columns:
-            geographic_concentration = (
+            geographic_share = (
                 portfolio_df.groupby("country")["market_value"].sum() / total_value
             )
-            geo_hhi = (geographic_concentration**2).sum()
-        else:
-            geo_hhi = None
+            geo_hhi = float((geographic_share**2).sum())
+            geographic_concentration = geographic_share.to_dict()
         asset_class_concentration = (
             portfolio_df.groupby("asset_class")["market_value"].sum() / total_value
         )
@@ -254,37 +267,27 @@ class RiskAnalytics:
             "largest_position": position_weights.max(),
             "sector_concentration": sector_concentration.to_dict(),
             "asset_class_concentration": asset_class_concentration.to_dict(),
-            "geographic_concentration": (
-                geographic_concentration.to_dict() if geographic_concentration else {}
-            ),
+            "geographic_concentration": geographic_concentration,
         }
 
     def calculate_credit_risk_metrics(self, credit_df: pd.DataFrame) -> Dict[str, Any]:
-        """Calculate credit risk metrics"""
         if "default_flag" in credit_df.columns:
-            overall_pd = credit_df["default_flag"].mean()
+            overall_pd = float(credit_df["default_flag"].mean())
         elif "credit_score" in credit_df.columns:
             overall_pd = self._estimate_pd_from_score(credit_df["credit_score"])
         else:
-            overall_pd = 0.02
+            overall_pd = DEFAULT_PD
         if "recovery_rate" in credit_df.columns:
-            lgd = 1 - credit_df["recovery_rate"].mean()
+            lgd = float(1 - credit_df["recovery_rate"].mean())
         else:
-            lgd = 0.45
-        if "exposure" in credit_df.columns:
-            total_exposure = credit_df["exposure"].sum()
-            avg_exposure = credit_df["exposure"].mean()
+            lgd = DEFAULT_LGD
+        exposure_column = _exposure_column(credit_df)
+        if exposure_column:
+            total_exposure = float(credit_df[exposure_column].sum())
+            avg_exposure = float(credit_df[exposure_column].mean())
         else:
-            total_exposure = (
-                credit_df["loan_amount"].sum()
-                if "loan_amount" in credit_df.columns
-                else 0
-            )
-            avg_exposure = (
-                credit_df["loan_amount"].mean()
-                if "loan_amount" in credit_df.columns
-                else 0
-            )
+            total_exposure = 0.0
+            avg_exposure = 0.0
         expected_loss = overall_pd * lgd * total_exposure
         credit_var_99 = self._calculate_credit_var(
             overall_pd, lgd, total_exposure, 0.99
@@ -306,25 +309,23 @@ class RiskAnalytics:
                 credit_df["rating"].value_counts(normalize=True).to_dict()
             )
             credit_metrics["rating_distribution"] = rating_distribution
-        if "sector" in credit_df.columns:
-            sector_exposure = credit_df.groupby("sector")[
-                "exposure" if "exposure" in credit_df.columns else "loan_amount"
-            ].sum()
-            sector_exposure_pct = sector_exposure / sector_exposure.sum()
-            credit_metrics["sector_exposure"] = sector_exposure_pct.to_dict()
+        if "sector" in credit_df.columns and exposure_column and total_exposure > 0:
+            sector_exposure = credit_df.groupby("sector")[exposure_column].sum()
+            credit_metrics["sector_exposure"] = (
+                sector_exposure / sector_exposure.sum()
+            ).to_dict()
         return credit_metrics
 
     def _estimate_pd_from_score(self, credit_scores: pd.Series) -> float:
-        """Estimate PD from credit scores using logistic transformation"""
-        min_score, max_score = (credit_scores.min(), credit_scores.max())
-        normalized_scores = (credit_scores - min_score) / (max_score - min_score)
+        normalized_scores = (credit_scores.clip(MIN_SCORE, MAX_SCORE) - MIN_SCORE) / (
+            MAX_SCORE - MIN_SCORE
+        )
         pd_estimates = 1 / (1 + np.exp(10 * (normalized_scores - 0.5)))
-        return pd_estimates.mean()
+        return float(pd_estimates.mean())
 
     def _calculate_credit_var(
         self, pd: float, lgd: float, exposure: float, confidence_level: float
     ) -> float:
-        """Calculate Credit VaR using single-factor model"""
         correlation = 0.12 * (1 - np.exp(-50 * pd)) / (1 - np.exp(-50)) + 0.24 * (
             1 - (1 - np.exp(-50 * pd)) / (1 - np.exp(-50))
         )
@@ -338,7 +339,6 @@ class RiskAnalytics:
     def perform_stress_testing(
         self, scenarios: Dict[str, Dict[str, float]]
     ) -> Dict[str, Any]:
-        """Perform stress testing on portfolio"""
         stress_results = {}
         for scenario_name, scenario_params in scenarios.items():
             logger.info(f"Running stress test: {scenario_name}")
@@ -365,7 +365,6 @@ class RiskAnalytics:
         return stress_results
 
     def _apply_market_stress(self, market_shock: float) -> float:
-        """Apply market stress scenario"""
         if self.portfolio_data is None:
             return 0.0
         current_value = self.portfolio_data["market_value"].sum()
@@ -373,23 +372,16 @@ class RiskAnalytics:
         return stressed_value - current_value
 
     def _apply_credit_stress(self, pd_multiplier: float) -> float:
-        """Apply credit stress scenario"""
         if self.credit_data is None:
             return 0.0
-        base_pd = 0.02
-        stressed_pd = base_pd * pd_multiplier
-        lgd = 0.45
-        total_exposure = (
-            self.credit_data["loan_amount"].sum()
-            if "loan_amount" in self.credit_data.columns
-            else 0
-        )
-        base_el = base_pd * lgd * total_exposure
-        stressed_el = stressed_pd * lgd * total_exposure
-        return stressed_el - base_el
+        metrics = self.calculate_credit_risk_metrics(self.credit_data)
+        base_pd = metrics["probability_of_default"]
+        stressed_pd = min(base_pd * pd_multiplier, 1.0)
+        lgd = metrics["loss_given_default"]
+        total_exposure = metrics["total_exposure"]
+        return (stressed_pd - base_pd) * lgd * total_exposure
 
     def _apply_interest_rate_stress(self, ir_shock: float) -> float:
-        """Apply interest rate stress scenario"""
         if self.portfolio_data is None:
             return 0.0
         avg_duration = 5.0
@@ -404,20 +396,15 @@ class RiskAnalytics:
         return duration_impact
 
     def calculate_regulatory_capital(self, credit_df: pd.DataFrame) -> Dict[str, float]:
-        """Calculate regulatory capital requirements (Basel III)"""
         rwa_corporate = 0
         rwa_retail = 0
         rwa_sovereign = 0
-        if "exposure_type" in credit_df.columns and "exposure" in credit_df.columns:
-            corporate_exposure = credit_df[credit_df["exposure_type"] == "corporate"][
-                "exposure"
-            ].sum()
-            retail_exposure = credit_df[credit_df["exposure_type"] == "retail"][
-                "exposure"
-            ].sum()
-            sovereign_exposure = credit_df[credit_df["exposure_type"] == "sovereign"][
-                "exposure"
-            ].sum()
+        exposure_column = _exposure_column(credit_df)
+        if "exposure_type" in credit_df.columns and exposure_column:
+            by_type = credit_df.groupby("exposure_type")[exposure_column].sum()
+            corporate_exposure = float(by_type.get("corporate", 0.0))
+            retail_exposure = float(by_type.get("retail", 0.0))
+            sovereign_exposure = float(by_type.get("sovereign", 0.0))
             rwa_corporate = (
                 corporate_exposure * self.basel_parameters["risk_weight_corporate"]
             )
@@ -457,10 +444,16 @@ class RiskAnalytics:
         }
 
     def detect_risk_anomalies(self, returns_df: pd.DataFrame) -> Dict[str, Any]:
-        """Detect anomalies in risk patterns"""
         anomalies = {}
         for column in returns_df.select_dtypes(include=[np.number]).columns:
             series = returns_df[column].dropna()
+            if len(series) < 4 or series.std() == 0:
+                anomalies[column] = {
+                    "z_score_anomalies": [],
+                    "iqr_anomalies": [],
+                    "anomaly_count": 0,
+                }
+                continue
             z_scores = np.abs(stats.zscore(series))
             z_anomalies = series[z_scores > 3].index.tolist()
             Q1 = series.quantile(0.25)
@@ -498,9 +491,8 @@ class RiskAnalytics:
         return anomalies
 
     def generate_risk_dashboard_data(self) -> Dict[str, Any]:
-        """Generate data for risk dashboard"""
         dashboard_data = {
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": _now(),
             "summary_metrics": {},
             "risk_breakdown": {},
             "alerts": [],
@@ -523,11 +515,9 @@ class RiskAnalytics:
             dashboard_data["risk_breakdown"]["credit"] = credit_metrics
             regulatory_capital = self.calculate_regulatory_capital(self.credit_data)
             dashboard_data["risk_breakdown"]["regulatory"] = regulatory_capital
-        if self.market_data is not None:
+        if self.market_data is not None and "returns" in self.market_data.columns:
             market_metrics = self.calculate_portfolio_risk_metrics(
                 self.market_data[["returns"]]
-                if "returns" in self.market_data.columns
-                else pd.DataFrame()
             )
             dashboard_data["risk_breakdown"]["market"] = {
                 "var_95": market_metrics.var_95,
@@ -540,7 +530,6 @@ class RiskAnalytics:
         return dashboard_data
 
     def _generate_risk_alerts(self) -> List[Dict[str, Any]]:
-        """Generate risk alerts based on thresholds"""
         alerts = []
         if self.portfolio_data is not None:
             concentration = self.analyze_concentration_risk(self.portfolio_data)
@@ -550,7 +539,7 @@ class RiskAnalytics:
                         "type": "concentration",
                         "severity": "high",
                         "message": f"Top 10 positions represent {concentration['top_10_concentration']:.1%} of portfolio",
-                        "timestamp": datetime.now().isoformat(),
+                        "timestamp": _now(),
                     }
                 )
             if concentration["largest_position"] > 0.1:
@@ -559,7 +548,7 @@ class RiskAnalytics:
                         "type": "concentration",
                         "severity": "medium",
                         "message": f"Largest position represents {concentration['largest_position']:.1%} of portfolio",
-                        "timestamp": datetime.now().isoformat(),
+                        "timestamp": _now(),
                     }
                 )
         if self.credit_data is not None:
@@ -570,15 +559,14 @@ class RiskAnalytics:
                         "type": "credit",
                         "severity": "high",
                         "message": f"Expected loss rate is {credit_metrics['expected_loss_rate']:.2%}",
-                        "timestamp": datetime.now().isoformat(),
+                        "timestamp": _now(),
                     }
                 )
         return alerts
 
     def export_risk_report(self, output_path: str) -> Any:
-        """Export comprehensive risk report"""
         report_data = {
-            "report_date": datetime.now().isoformat(),
+            "report_date": _now(),
             "executive_summary": {},
             "detailed_analysis": {},
             "regulatory_compliance": {},
@@ -595,11 +583,9 @@ class RiskAnalytics:
             report_data["regulatory_compliance"]["basel_iii"] = (
                 self.calculate_regulatory_capital(self.credit_data)
             )
-        if self.market_data is not None:
+        if self.market_data is not None and "returns" in self.market_data.columns:
             market_metrics = self.calculate_portfolio_risk_metrics(
                 self.market_data[["returns"]]
-                if "returns" in self.market_data.columns
-                else pd.DataFrame()
             )
             report_data["detailed_analysis"]["market"] = {
                 "var_95": market_metrics.var_95,
@@ -610,15 +596,19 @@ class RiskAnalytics:
                 "sharpe_ratio": market_metrics.sharpe_ratio,
                 "volatility": market_metrics.volatility,
             }
+        credit_analysis = report_data["detailed_analysis"].get("credit")
+        if credit_analysis:
+            report_data["executive_summary"] = {
+                "total_exposure": credit_analysis["total_exposure"],
+                "expected_loss_rate": credit_analysis["expected_loss_rate"],
+                "credit_var_99": credit_analysis["credit_var_99"],
+            }
         report_data["recommendations"] = self._generate_recommendations()
-        import json
-
-        with open(output_path, "w") as f:
-            json.dump(report_data, f, indent=2, default=str)
+        with open(output_path, "w", encoding="utf-8") as f:
+            json.dump(report_data, f, indent=2, default=_json_default)
         logger.info(f"Risk report exported to {output_path}")
 
     def _generate_recommendations(self) -> List[str]:
-        """Generate risk management recommendations"""
         recommendations = []
         if self.portfolio_data is not None:
             concentration = self.analyze_concentration_risk(self.portfolio_data)
@@ -640,7 +630,7 @@ class RiskAnalytics:
 
 
 def main() -> Any:
-    """Example usage of RiskAnalytics"""
+    logging.basicConfig(level=logging.INFO)
     risk_analyzer = RiskAnalytics()
     np.random.seed(42)
     portfolio_data = pd.DataFrame(
@@ -710,7 +700,9 @@ def main() -> Any:
     logger.info("Stress testing completed")
     dashboard_data = risk_analyzer.generate_risk_dashboard_data()
     logger.info(f"Generated dashboard with {len(dashboard_data['alerts'])} alerts")
-    risk_analyzer.export_risk_report("risk_report.json")
+    report_path = ARTIFACTS_DIR / "research" / "risk_report.json"
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    risk_analyzer.export_risk_report(str(report_path))
     logger.info("Risk analysis completed successfully!")
 
 

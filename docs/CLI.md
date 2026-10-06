@@ -346,9 +346,9 @@ npm run android
 ### Train Model
 
 ```bash
-cd code/ai_models/training_scripts
+cd code/ai_models
 source venv_ai/bin/activate
-python train_model.py
+make train
 ```
 
 ### Start AI Model Server
@@ -356,7 +356,7 @@ python train_model.py
 ```bash
 cd code/ai_models
 source venv_ai/bin/activate
-python api.py
+make serve
 ```
 
 ## CLI Command Reference Table

@@ -1,10 +1,3 @@
-/**
- * Dashboard Screen
- * Displays the user's credit score, factors, recent loan applications, and
- * quick actions, backed by the real backend (/api/credit/calculate-score,
- * /api/credit/history, /api/loans/applications).
- */
-
 import { useNavigation } from "@react-navigation/native";
 import React, { useCallback, useEffect, useState } from "react";
 import {
@@ -24,13 +17,13 @@ import {
   fetchCreditHistory,
   fetchCreditScore,
 } from "../store/slices/creditSlice";
+import { getScoringSummary } from "../services/credit.service";
 import { fetchMyLoanApplications } from "../store/slices/loanSlice";
 import {
   responsiveFontSize,
   responsiveHeight,
   responsiveWidth,
 } from "../utils/responsive";
-
 const colors = {
   primary: "#4A90E2",
   accent: "#50E3C2",
@@ -43,10 +36,8 @@ const colors = {
   warning: "#F5A623",
   error: "#D0021B",
 };
-
 const SCORE_MIN = 300;
 const SCORE_MAX = 850;
-
 const gradeColor: Record<string, string> = {
   Excellent: colors.success,
   "Very Good": colors.success,
@@ -54,38 +45,29 @@ const gradeColor: Record<string, string> = {
   Fair: colors.warning,
   Poor: colors.error,
 };
-
 const DashboardScreen = () => {
   const navigation = useNavigation<any>();
   const dispatch = useAppDispatch();
-
   const { user } = useAppSelector((state) => state.auth);
   const { score, scoreFactors, history, isLoading, error, needsWallet } =
     useAppSelector((state) => state.credit);
   const { applications } = useAppSelector((state) => state.loan);
-
   const [refreshing, setRefreshing] = useState(false);
   const [recalculating, setRecalculating] = useState(false);
-
   const walletAddress = user?.profile?.wallet_address || undefined;
-
   const loadDashboard = useCallback(() => {
     dispatch(fetchCreditScore(walletAddress));
     dispatch(fetchCreditHistory({ page: 1, perPage: 20 }));
     dispatch(fetchMyLoanApplications({ page: 1, perPage: 5 }));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [walletAddress]);
-
+  }, [dispatch, walletAddress]);
   useEffect(() => {
     loadDashboard();
   }, [loadDashboard]);
-
   const onRefresh = async () => {
     setRefreshing(true);
     loadDashboard();
     setRefreshing(false);
   };
-
   const handleRecalculate = async () => {
     setRecalculating(true);
     try {
@@ -96,11 +78,9 @@ const DashboardScreen = () => {
       setRecalculating(false);
     }
   };
-
   const activeApplications = applications.filter((app) =>
     ["approved", "disbursed", "under_review", "submitted"].includes(app.status),
   ).length;
-
   if (isLoading && !score && !needsWallet) {
     return (
       <View style={styles.loadingContainer}>
@@ -109,14 +89,13 @@ const DashboardScreen = () => {
       </View>
     );
   }
-
+  const scoring = getScoringSummary(score);
   const scorePercentage = score
     ? ((score.score - SCORE_MIN) / (SCORE_MAX - SCORE_MIN)) * 100
     : 0;
   const scoreColor = score
     ? gradeColor[score.score_grade] || colors.primary
     : colors.textSecondary;
-
   return (
     <ScrollView
       style={styles.container}
@@ -212,9 +191,15 @@ const DashboardScreen = () => {
                 color={colors.primary}
                 size={responsiveFontSize(2.5)}
               />
-              <Text style={styles.statTitle}>Model Confidence</Text>
+              <Text style={styles.statTitle}>
+                {scoring?.source === "rule_based"
+                  ? "Rule Confidence"
+                  : "Model Confidence"}
+              </Text>
               <Text style={styles.statValue}>
-                {score ? `${Math.round(score.confidence * 100)}%` : "-"}
+                {scoring?.confidencePercent != null
+                  ? `${scoring.confidencePercent}%`
+                  : "-"}
               </Text>
             </View>
             <View style={styles.statCard}>
@@ -240,6 +225,60 @@ const DashboardScreen = () => {
               <Text style={styles.statValue}>{activeApplications}</Text>
             </View>
           </View>
+
+          {scoring && scoring.source !== "unknown" && (
+            <View style={styles.factorsContainer}>
+              <Text style={styles.sectionTitle}>How This Score Was Made</Text>
+              <Text style={styles.factorName}>{scoring.sourceLabel}</Text>
+              {scoring.modelLabel ? (
+                <Text style={styles.factorImpact}>{scoring.modelLabel}</Text>
+              ) : null}
+              {scoring.source === "rule_based" ? (
+                <Text style={styles.factorImpact}>
+                  The AI scoring service was unavailable or had no usable
+                  history, so the built-in rules were used.
+                </Text>
+              ) : null}
+              {scoring.positive.map((item) => (
+                <View key={`pos-${item.factor}`} style={styles.insightRow}>
+                  <Icon
+                    name="trending-up"
+                    type="material"
+                    color={colors.success}
+                    size={responsiveFontSize(2.2)}
+                    containerStyle={styles.factorIcon}
+                  />
+                  <View style={styles.factorTextContainer}>
+                    <Text style={styles.factorName}>{item.factor}</Text>
+                    {item.description ? (
+                      <Text style={styles.factorImpact}>
+                        {item.description}
+                      </Text>
+                    ) : null}
+                  </View>
+                </View>
+              ))}
+              {scoring.negative.map((item) => (
+                <View key={`neg-${item.factor}`} style={styles.insightRow}>
+                  <Icon
+                    name="trending-down"
+                    type="material"
+                    color={colors.error}
+                    size={responsiveFontSize(2.2)}
+                    containerStyle={styles.factorIcon}
+                  />
+                  <View style={styles.factorTextContainer}>
+                    <Text style={styles.factorName}>{item.factor}</Text>
+                    {item.description ? (
+                      <Text style={styles.factorImpact}>
+                        {item.description}
+                      </Text>
+                    ) : null}
+                  </View>
+                </View>
+              ))}
+            </View>
+          )}
 
           {scoreFactors.length > 0 && (
             <View style={styles.factorsContainer}>
@@ -315,7 +354,6 @@ const DashboardScreen = () => {
     </ScrollView>
   );
 };
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -448,6 +486,11 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
+  insightRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingTop: responsiveHeight(1.5),
+  },
   factorIcon: {
     marginRight: responsiveWidth(3),
   },
@@ -528,5 +571,4 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
 });
-
 export default DashboardScreen;

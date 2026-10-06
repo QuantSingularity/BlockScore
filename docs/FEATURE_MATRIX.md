@@ -8,7 +8,7 @@ Complete feature list with implementation details and examples.
 | ------------------------ | ------------------------- | -------------------------------------------- | ---------------------------------- | ------------------------------------------------------------ | ------------------------------- |
 | User Registration        | Create new user accounts  | `code/backend/app.py`                        | `POST /api/auth/register`          | [examples/auth_example.md](examples/auth_example.md)         | Email validation required       |
 | User Login               | JWT-based authentication  | `code/backend/app.py`                        | `POST /api/auth/login`             | [examples/auth_example.md](examples/auth_example.md)         | Returns access & refresh tokens |
-| Credit Score Calculation | AI-powered credit scoring | `code/ai_models/api.py`                      | `POST /api/credit/calculate-score` | [examples/credit_scoring.md](examples/credit_scoring.md)     | Uses ML models                  |
+| Credit Score Calculation | AI-powered credit scoring | `code/ai_models/src/blockscore_ai/api/`      | `POST /api/credit/calculate-score` | [examples/credit_scoring.md](examples/credit_scoring.md)     | Uses ML models                  |
 | Credit History           | View transaction history  | `code/backend/models/credit.py`              | `GET /api/credit/history`          | [examples/credit_scoring.md](examples/credit_scoring.md)     | Paginated results               |
 | Loan Application         | Submit loan requests      | `code/backend/app.py`                        | `POST /api/loans/apply`            | [examples/loan_application.md](examples/loan_application.md) | Rate limited: 3/hour            |
 | Loan Calculator          | Calculate loan terms      | `code/backend/app.py`                        | `POST /api/loans/calculate`        | [examples/loan_application.md](examples/loan_application.md) | No auth required                |
@@ -23,14 +23,14 @@ Complete feature list with implementation details and examples.
 
 ## AI/ML Features
 
-| Feature             | Short description         | Module / File                                    | CLI flag / API                 | Example (path)                                           | Notes                  |
-| ------------------- | ------------------------- | ------------------------------------------------ | ------------------------------ | -------------------------------------------------------- | ---------------------- |
-| Credit Score Model  | XGBoost-based scoring     | `code/ai_models/advanced_credit_model.py`        | `calculate_score()`            | [examples/ai_integration.md](examples/ai_integration.md) | v1.2.0 model           |
-| Fraud Detection     | Anomaly detection         | `code/ai_models/risk_analytics.py`               | `detect_fraud()`               | [examples/ai_integration.md](examples/ai_integration.md) | Real-time analysis     |
-| Risk Analytics      | Portfolio risk assessment | `code/ai_models/risk_analytics.py`               | `calculate_risk()`             | [examples/ai_integration.md](examples/ai_integration.md) | VaR, Sharpe ratio      |
-| Behavioral Analysis | Payment pattern analysis  | `code/ai_models/advanced_credit_model.py`        | Automatic                      | N/A                                                      | Time series analysis   |
-| Model Training      | Train custom models       | `code/ai_models/training_scripts/train_model.py` | `python train_model.py`        | N/A                                                      | Requires training data |
-| Feature Engineering | Extract credit features   | `code/ai_models/api.py`                          | `preprocess_blockchain_data()` | [examples/ai_integration.md](examples/ai_integration.md) | 7 key features         |
+| Feature             | Short description         | Module / File                                | CLI flag / API                   | Example (path)                                           | Notes                  |
+| ------------------- | ------------------------- | -------------------------------------------- | -------------------------------- | -------------------------------------------------------- | ---------------------- |
+| Credit Score Model  | XGBoost-based scoring     | `code/ai_models/src/blockscore_ai/scoring/`  | `ScoringService.score_history()` | [examples/ai_integration.md](examples/ai_integration.md) | v1.2.0 model           |
+| Fraud Detection     | Anomaly detection         | `code/ai_models/src/blockscore_ai/research/` | `detect_fraud()`                 | [examples/ai_integration.md](examples/ai_integration.md) | Real-time analysis     |
+| Risk Analytics      | Portfolio risk assessment | `code/ai_models/src/blockscore_ai/research/` | `calculate_risk()`               | [examples/ai_integration.md](examples/ai_integration.md) | VaR, Sharpe ratio      |
+| Behavioral Analysis | Payment pattern analysis  | `code/ai_models/src/blockscore_ai/research/` | Automatic                        | N/A                                                      | Time series analysis   |
+| Model Training      | Train custom models       | `code/ai_models/src/blockscore_ai/training/` | `make train`                     | N/A                                                      | Requires training data |
+| Feature Engineering | Extract credit features   | `code/ai_models/src/blockscore_ai/scoring/`  | `preprocess_blockchain_data()`   | [examples/ai_integration.md](examples/ai_integration.md) | 7 key features         |
 
 ## Blockchain Features
 

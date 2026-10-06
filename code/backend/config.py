@@ -1,7 +1,3 @@
-"""
-Configuration management for BlockScore Backend
-"""
-
 import os
 from datetime import timedelta
 from typing import Type
@@ -12,7 +8,6 @@ load_dotenv()
 
 
 class Config:
-    """Base configuration class"""
 
     SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-key-change-in-production")
     FLASK_ENV = os.getenv("FLASK_ENV", "development")
@@ -34,41 +29,20 @@ class Config:
     BLOCKCHAIN_PROVIDER_URL = os.getenv(
         "BLOCKCHAIN_PROVIDER_URL", "http://localhost:8545"
     )
-    # Network the configured provider points at. 1337 matches the chainId
-    # used by code/blockchain/hardhat.config.js for local development.
     BLOCKCHAIN_NETWORK_ID = int(os.getenv("BLOCKCHAIN_NETWORK_ID", 1337))
     BLOCKCHAIN_NETWORK_NAME = os.getenv("BLOCKCHAIN_NETWORK_NAME", "development")
-    # Address/key BlockchainService signs and sends transactions with. This
-    # account must hold CREDIT_PROVIDER_ROLE on CreditScoreV2 (see
-    # code/blockchain/scripts/deploy.js) for submit_credit_score_update and
-    # record_payment to succeed.
     BLOCKCHAIN_FROM_ADDRESS = os.getenv("BLOCKCHAIN_FROM_ADDRESS", "")
     BLOCKCHAIN_PRIVATE_KEY = os.getenv("BLOCKCHAIN_PRIVATE_KEY", "")
-    # Per-contract deployment addresses, printed by
-    # code/blockchain/scripts/deploy.js after a deployment.
     CREDIT_SCORE_CONTRACT_ADDRESS = os.getenv("CREDIT_SCORE_CONTRACT_ADDRESS", "")
     LOAN_AGREEMENT_CONTRACT_ADDRESS = os.getenv("LOAN_AGREEMENT_CONTRACT_ADDRESS", "")
     GOVERNANCE_CONTRACT_ADDRESS = os.getenv("GOVERNANCE_CONTRACT_ADDRESS", "")
-    # Overrides the default "../blockchain/artifacts/contracts" relative
-    # path used to load compiled contract ABIs. Needed for any deployment
-    # where code/blockchain isn't a sibling directory on the same
-    # filesystem as this process - e.g. the Dockerized backend, whose
-    # build context (code/backend) doesn't include code/blockchain at
-    # all. Point this at wherever the compiled artifacts/contracts/
-    # directory was copied or mounted into.
     CONTRACT_ARTIFACTS_PATH = os.getenv("CONTRACT_ARTIFACTS_PATH", "")
-    # No IdentityRegistry or PaymentProcessor contract exists in
-    # code/blockchain/contracts yet. These are reserved for when/if those
-    # contracts are added; BlockchainService logs (rather than errors) when
-    # it finds them unconfigured.
     IDENTITY_REGISTRY_CONTRACT_ADDRESS = os.getenv(
         "IDENTITY_REGISTRY_CONTRACT_ADDRESS", ""
     )
     PAYMENT_PROCESSOR_CONTRACT_ADDRESS = os.getenv(
         "PAYMENT_PROCESSOR_CONTRACT_ADDRESS", ""
     )
-    # Generic/legacy single-contract settings, kept for backwards
-    # compatibility with anything still reading them directly.
     CONTRACT_ADDRESS = os.getenv(
         "CONTRACT_ADDRESS", "0x0000000000000000000000000000000000000000"
     )
@@ -84,6 +58,10 @@ class Config:
     RATELIMIT_LOGIN = os.getenv("RATE_LIMIT_LOGIN", "5 per minute")
     AI_MODEL_URL = os.getenv("AI_MODEL_URL", "http://localhost:5001")
     AI_MODEL_TIMEOUT = float(os.getenv("AI_MODEL_TIMEOUT", "5"))
+    AI_MODEL_API_KEY = os.getenv("AI_MODEL_API_KEY", "")
+    AI_MODEL_RETRIES = int(os.getenv("AI_MODEL_RETRIES", "2"))
+    AI_MODEL_FAILURE_THRESHOLD = int(os.getenv("AI_MODEL_FAILURE_THRESHOLD", "3"))
+    AI_MODEL_COOLDOWN_SECONDS = float(os.getenv("AI_MODEL_COOLDOWN_SECONDS", "30"))
     CREDIT_BUREAU_API_KEY = os.getenv("CREDIT_BUREAU_API_KEY", "")
     IDENTITY_VERIFICATION_API_KEY = os.getenv("IDENTITY_VERIFICATION_API_KEY", "")
     LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
@@ -105,14 +83,12 @@ class Config:
 
 
 class DevelopmentConfig(Config):
-    """Development configuration"""
 
     DEBUG = True
     TESTING = False
 
 
 class ProductionConfig(Config):
-    """Production configuration"""
 
     DEBUG = False
     TESTING = False
@@ -124,11 +100,11 @@ class ProductionConfig(Config):
 
 
 class TestingConfig(Config):
-    """Testing configuration"""
 
     DEBUG = True
     TESTING = True
     SQLALCHEMY_DATABASE_URI = "sqlite:///:memory:"
+    RATELIMIT_ENABLED = False
     JWT_ACCESS_TOKEN_EXPIRES = timedelta(seconds=60)
     JWT_REFRESH_TOKEN_EXPIRES = timedelta(seconds=120)
 
@@ -142,6 +118,5 @@ config = {
 
 
 def get_config() -> Type[Config]:
-    """Get configuration based on environment"""
     env = os.getenv("FLASK_ENV", "development")
     return config.get(env, config["default"])

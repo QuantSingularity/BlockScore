@@ -1,15 +1,3 @@
-"""
-Tests for BlockchainService's real contract-calling methods.
-
-These exercise the actual (non-mocked) service logic - only the low-level
-web3 contract instance is mocked - to verify BlockchainService calls
-functions that actually exist on CreditScoreV2/LoanContractV2 with
-correctly-shaped arguments, and that transaction records are written to
-the database successfully (guarding against regressions like the
-previously-missing `self.db` assignment, which made every real call crash
-with AttributeError).
-"""
-
 from decimal import Decimal
 from unittest.mock import MagicMock
 
@@ -19,7 +7,6 @@ from models.blockchain import BlockchainTransaction
 
 @pytest.fixture
 def mock_contract():
-    """A MagicMock standing in for a web3 Contract instance."""
     contract = MagicMock()
     built_tx = {
         "from": "0x1234567890123456789012345678901234567890",
@@ -53,9 +40,6 @@ class TestSubmitCreditScoreUpdate:
     def test_calls_add_credit_record_with_correct_arguments(
         self, blockchain_service, mock_contract
     ):
-        """The real CreditScoreV2 function is addCreditRecord(user, amount,
-        recordType, scoreImpact, dataHash, complianceFlags, signature) -
-        not the old, nonexistent updateCreditScore(user, score, ts, id)."""
         blockchain_service._get_contract_instance = MagicMock(
             return_value=mock_contract
         )
@@ -76,12 +60,9 @@ class TestSubmitCreditScoreUpdate:
         user, amount, record_type, score_impact, data_hash, flags, signature = args
         assert user == "0xBorrower000000000000000000000000000001"
         assert record_type == "score_recalculation"
-        # 720 - 700 = 20, well within the contract's +/-50 bound
         assert score_impact == 20
         assert signature == b""
 
-        # And the transaction was actually persisted (this would raise
-        # AttributeError if self.db were never assigned).
         stored = BlockchainTransaction.query.filter_by(transaction_hash=tx_hash).first()
         assert stored is not None
         assert stored.function_name == "addCreditRecord"
@@ -99,12 +80,12 @@ class TestSubmitCreditScoreUpdate:
             credit_score_id="score-2",
             score=850,
             wallet_address="0xBorrower000000000000000000000000000002",
-            previous_score=300,  # a 550-point jump, far outside +/-50
+            previous_score=300,
         )
 
         args, _ = mock_contract.functions.addCreditRecord.call_args
         score_impact = args[3]
-        assert score_impact == 50  # clamped to CreditScoreV2's MAX_SCORE_IMPACT
+        assert score_impact == 50
 
     def test_no_previous_score_logs_neutral_event(
         self, blockchain_service, mock_contract
@@ -130,10 +111,6 @@ class TestRecordPayment:
     def test_calls_make_payment_not_a_nonexistent_function(
         self, blockchain_service, mock_contract
     ):
-        """The old code called recordPayment() on a "payment processor"
-        contract that doesn't exist anywhere in code/blockchain/contracts.
-        The real function is LoanContractV2.makePayment(loanId,
-        paymentAmount, paymentMethod)."""
         blockchain_service._get_contract_instance = MagicMock(
             return_value=mock_contract
         )
@@ -162,11 +139,6 @@ class TestSubmitLoanAgreement:
     def test_records_borrower_submitted_transaction_without_relaying(
         self, blockchain_service
     ):
-        """LoanContractV2.submitLoanApplication requires msg.sender to be
-        the applicant and to have signed the request themselves - a
-        service wallet can never satisfy that. submit_loan_agreement
-        should record/track an already-broadcast transaction hash rather
-        than attempt to send one itself."""
         blockchain_service.update_transaction_status = MagicMock()
 
         result = blockchain_service.submit_loan_agreement(

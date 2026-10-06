@@ -1,8 +1,3 @@
-"""
-Compliance Service for BlockScore Backend
-KYC/AML and regulatory compliance management
-"""
-
 import enum
 import logging
 import uuid
@@ -29,7 +24,6 @@ class RiskLevel(enum.Enum):
 
 
 class ComplianceService:
-    """Comprehensive compliance service for financial regulations"""
 
     def __init__(self, db: Any) -> None:
         self.db = db
@@ -75,7 +69,6 @@ class ComplianceService:
     def perform_kyc_verification(
         self, user_id: Any, user_data: Dict[str, Any]
     ) -> Dict[str, Any]:
-        """Perform KYC identity verification"""
         try:
             identity_verified = self._verify_identity(user_data)
             verification_id = str(uuid.uuid4())
@@ -106,7 +99,6 @@ class ComplianceService:
     def perform_aml_screening(
         self, user_id: Any, transaction_data: Dict[str, Any] = None
     ) -> Dict[str, Any]:
-        """Perform AML screening on a user/transaction"""
         try:
             risk_score = self._calculate_risk_score(user_id, transaction_data or {})
             risk_level = self._score_to_risk_level(risk_score)
@@ -131,7 +123,6 @@ class ComplianceService:
     def perform_kyc_assessment(
         self, user_id: str, kyc_level: str = "basic"
     ) -> Dict[str, Any]:
-        """Perform KYC assessment for user"""
         try:
             user = db.session.get(User, user_id)
             if not user or not user.profile:
@@ -185,7 +176,6 @@ class ComplianceService:
     def perform_aml_check(
         self, user_id: str, transaction_amount: Optional[Decimal] = None
     ) -> Dict[str, Any]:
-        """Perform AML check on user and optionally a transaction"""
         try:
             user = db.session.get(User, user_id)
             if not user:
@@ -221,7 +211,6 @@ class ComplianceService:
             raise
 
     def assess_loan_compliance(self, loan_application_id: str) -> Dict[str, Any]:
-        """Assess loan application for regulatory compliance"""
         try:
             loan_app = db.session.get(LoanApplication, loan_application_id)
             if not loan_app:
@@ -257,7 +246,6 @@ class ComplianceService:
             raise
 
     def monitor_ongoing_compliance(self, user_id: str) -> Dict[str, Any]:
-        """Monitor ongoing compliance for a user"""
         try:
             records = (
                 ComplianceRecord.query.filter_by(entity_id=str(user_id))
@@ -286,7 +274,6 @@ class ComplianceService:
         notes: str = None,
         reviewed_by: str = None,
     ) -> Dict[str, Any]:
-        """Update the status of a compliance record"""
         try:
             record = db.session.get(ComplianceRecord, record_id)
             if not record:
@@ -321,7 +308,6 @@ class ComplianceService:
         start_date: datetime = None,
         end_date: datetime = None,
     ) -> Dict[str, Any]:
-        """Generate comprehensive compliance report"""
         try:
             query = ComplianceRecord.query
             if entity_type:
@@ -363,21 +349,14 @@ class ComplianceService:
             self.logger.error(f"Compliance report error: {e}")
             raise
 
-    # ------------------------------------------------------------------
-    # Private helpers
-    # ------------------------------------------------------------------
-
     def _verify_identity(self, user_data: Dict[str, Any]) -> bool:
-        """Simulate identity verification (stub)"""
         required = ["first_name", "last_name", "date_of_birth"]
         for field in required:
             if not user_data.get(field):
-                # Check top-level flattened or nested
                 pass
         return bool(user_data.get("first_name") or user_data.get("user_id"))
 
     def _calculate_risk_score(self, user_id: Any, data: Dict[str, Any]) -> float:
-        """Calculate a basic risk score (0-100)"""
         amount = data.get("amount", 0) or 0
         try:
             amount = float(amount)

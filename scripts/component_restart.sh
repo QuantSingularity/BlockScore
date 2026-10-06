@@ -18,7 +18,7 @@
 #                                      development network)
 #   frontend   -> web-frontend       (Vite dev server)
 #   mobile     -> mobile-frontend    (React Native / Metro dev server)
-#   ai         -> code/ai_models     (Python; server.py or app.py)
+#   ai         -> code/ai_models     (Python; blockscore_ai package)
 # ========================================================================
 
 # Set strict error handling
@@ -408,18 +408,13 @@ start_component() {
           python_cmd="python"
         fi
         # Run the AI service
-        if [ -f "server.py" ]; then
-          "$python_cmd" server.py > "${CONFIG_DIR}/ai.log" 2>&1 &
-          local pid=$!
-          save_process_id "$component" "$pid"
-          echo -e "${GREEN}AI services started with PID $pid${NC}"
-        elif [ -f "app.py" ]; then
-          "$python_cmd" app.py > "${CONFIG_DIR}/ai.log" 2>&1 &
+        if [ -f "wsgi.py" ]; then
+          PYTHONPATH="src${PYTHONPATH:+:$PYTHONPATH}" "$python_cmd" -m blockscore_ai > "${CONFIG_DIR}/ai.log" 2>&1 &
           local pid=$!
           save_process_id "$component" "$pid"
           echo -e "${GREEN}AI services started with PID $pid${NC}"
         else
-          echo -e "${RED}AI service entry point not found (expected server.py or app.py)${NC}"
+          echo -e "${RED}AI service entry point not found (expected wsgi.py)${NC}"
           return 1
         fi
       else

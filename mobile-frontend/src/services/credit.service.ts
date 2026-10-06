@@ -1,12 +1,5 @@
-/**
- * Credit Service
- * Fetches and calculates credit scores against the real backend
- * (code/backend/app.py: /api/credit/calculate-score, /api/credit/history).
- */
-
 import { API_CONFIG } from "../config/api.config";
 import httpClient from "./http.client";
-
 export interface ScoreBreakdown {
   total_score?: number;
   payment_history?: number;
@@ -18,7 +11,6 @@ export interface ScoreBreakdown {
   debt_to_income?: number;
   blockchain_activity?: number;
 }
-
 export interface CreditFactor {
   factor_type: string;
   factor_name: string;
@@ -27,20 +19,39 @@ export interface CreditFactor {
   contribution: number;
   impact?: string;
 }
-
+export type ScoringSource = "ai_model" | "rule_based" | "unknown";
+export interface ScoreInsight {
+  factor: string;
+  impact: string;
+  description?: string;
+}
+export interface ScoreInsights {
+  positive: ScoreInsight[];
+  negative: ScoreInsight[];
+}
 export interface CreditScoreResult {
   credit_score_id: string;
   score: number;
   score_grade: string;
   model_version: string;
+  model_name?: string;
   calculated_at: string;
   expires_at: string;
   is_valid: boolean;
   score_breakdown: ScoreBreakdown;
-  confidence: number;
+  confidence: number | null;
+  scoring_source?: ScoringSource;
+  insights?: ScoreInsights;
   factors?: CreditFactor[];
 }
-
+export interface ScoringSummary {
+  source: ScoringSource;
+  sourceLabel: string;
+  confidencePercent: number | null;
+  modelLabel: string | null;
+  positive: ScoreInsight[];
+  negative: ScoreInsight[];
+}
 export interface CreditHistoryEvent {
   id: string;
   event_type: string;
@@ -54,7 +65,6 @@ export interface CreditHistoryEvent {
   transaction_id?: string;
   event_date: string;
 }
-
 export interface CreditHistoryResult {
   history: CreditHistoryEvent[];
   pagination: {
@@ -66,12 +76,6 @@ export interface CreditHistoryResult {
     has_prev: boolean;
   };
 }
-
-/**
- * Get the current credit score. There is no dedicated "get" endpoint; the
- * calculate-score endpoint returns the cached score when one is still valid,
- * so calling it with force_recalculation=false doubles as a "get" call.
- */
 export const getCreditScore = async (
   walletAddress?: string,
 ): Promise<CreditScoreResult> => {
@@ -90,10 +94,6 @@ export const getCreditScore = async (
     );
   }
 };
-
-/**
- * Force a fresh credit score calculation.
- */
 export const calculateCreditScore = async (
   walletAddress?: string,
 ): Promise<CreditScoreResult> => {
@@ -112,10 +112,6 @@ export const calculateCreditScore = async (
     );
   }
 };
-
-/**
- * Get the current user's credit history (paginated, scoped by JWT identity).
- */
 export const getCreditHistory = async (
   page = 1,
   perPage = 20,
@@ -134,20 +130,16 @@ export const getCreditHistory = async (
     );
   }
 };
-
-/**
- * Extract a display-friendly list of score factors from a calculation
- * result. Prefers the detailed `factors` array (only present on a fresh
- * calculation); falls back to the always-present `score_breakdown` so the UI
- * has something to show even when the score was served from cache.
- */
 export const getScoreFactors = (
   result: CreditScoreResult | null,
-): { name: string; value: number; description?: string }[] => {
+): {
+  name: string;
+  value: number;
+  description?: string;
+}[] => {
   if (!result) {
     return [];
   }
-
   if (result.factors?.length) {
     return result.factors.map((factor) => ({
       name: factor.factor_name,
@@ -155,7 +147,6 @@ export const getScoreFactors = (
       description: factor.factor_description,
     }));
   }
-
   const breakdown = result.score_breakdown || {};
   const labels: Record<string, string> = {
     payment_history: "Payment History",
@@ -167,11 +158,39 @@ export const getScoreFactors = (
     debt_to_income: "Debt to Income",
     blockchain_activity: "Blockchain Activity",
   };
-
   return Object.entries(labels)
     .filter(([key]) => breakdown[key as keyof ScoreBreakdown] !== undefined)
     .map(([key, name]) => ({
       name,
       value: Math.round(breakdown[key as keyof ScoreBreakdown] as number),
     }));
+};
+const SOURCE_LABELS: Record<ScoringSource, string> = {
+  ai_model: "AI model",
+  rule_based: "Rule-based engine",
+  unknown: "Unknown",
+};
+export const getScoringSummary = (
+  result: CreditScoreResult | null,
+): ScoringSummary | null => {
+  if (!result) {
+    return null;
+  }
+  const source: ScoringSource = result.scoring_source ?? "unknown";
+  const confidence =
+    typeof result.confidence === "number" && Number.isFinite(result.confidence)
+      ? Math.round(Math.min(1, Math.max(0, result.confidence)) * 100)
+      : null;
+  const modelLabel =
+    source === "ai_model" && result.model_name
+      ? `${result.model_name} v${result.model_version || "?"}`
+      : null;
+  return {
+    source,
+    sourceLabel: SOURCE_LABELS[source] ?? SOURCE_LABELS.unknown,
+    confidencePercent: confidence,
+    modelLabel,
+    positive: result.insights?.positive ?? [],
+    negative: result.insights?.negative ?? [],
+  };
 };

@@ -1,7 +1,3 @@
-"""
-Audit and compliance models for BlockScore Backend
-"""
-
 import enum
 import json
 import uuid
@@ -89,7 +85,6 @@ class AuditLog(db.Model):
     )
 
     def __init__(self, **kwargs):
-        # Coerce AuditEventType enum to its string value so the String column accepts it
         et = kwargs.get("event_type")
         if et is not None and hasattr(et, "value"):
             kwargs["event_type"] = et.value

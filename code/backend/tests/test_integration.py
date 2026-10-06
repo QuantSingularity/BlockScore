@@ -1,8 +1,3 @@
-"""
-Integration tests for the BlockScore backend API.
-Tests aligned with the new Flask app structure.
-"""
-
 import json
 import os
 import sys
@@ -23,10 +18,8 @@ logger = logging.getLogger(__name__)
 
 
 class TestIntegration(unittest.TestCase):
-    """Integration tests for the BlockScore backend API."""
 
     def setUp(self) -> Any:
-        """Set up test client and app context."""
         self.flask_app = create_app("testing")
         self.flask_app.config.update(
             TESTING=True,
@@ -44,13 +37,11 @@ class TestIntegration(unittest.TestCase):
         }
 
     def tearDown(self) -> Any:
-        """Tear down after each test."""
         _db.session.remove()
         _db.drop_all()
         self.ctx.pop()
 
     def _register_and_login(self, email: str = "int_test@example.com") -> str:
-        """Helper: register user and return access token."""
         self.client.post(
             "/api/auth/register",
             json={
@@ -70,7 +61,6 @@ class TestIntegration(unittest.TestCase):
         return ""
 
     def test_health_check(self) -> Any:
-        """Test the health check endpoint returns expected structure."""
         response = self.client.get("/api/health")
         data = json.loads(response.data)
         self.assertIn(response.status_code, (200, 503))
@@ -81,7 +71,6 @@ class TestIntegration(unittest.TestCase):
         self.assertIn("database", data["services"])
 
     def test_register_new_user(self) -> Any:
-        """Test registering a brand new user."""
         response = self.client.post(
             "/api/auth/register",
             json={
@@ -97,7 +86,6 @@ class TestIntegration(unittest.TestCase):
         self.assertIn("user", data)
 
     def test_register_duplicate_email(self) -> Any:
-        """Test that duplicate email registration is rejected."""
         payload = {
             "email": "dup_int@example.com",
             "password": "SecurePass123!",
@@ -114,7 +102,6 @@ class TestIntegration(unittest.TestCase):
         self.assertFalse(data["success"])
 
     def test_login_nonexistent_user(self) -> Any:
-        """Test login with nonexistent user returns 401."""
         response = self.client.post(
             "/api/auth/login",
             json={"email": "ghost@example.com", "password": "Password123!"},
@@ -125,7 +112,6 @@ class TestIntegration(unittest.TestCase):
         self.assertFalse(data["success"])
 
     def test_login_wrong_password(self) -> Any:
-        """Test login with wrong password returns 401."""
         self.client.post(
             "/api/auth/register",
             json={
@@ -143,7 +129,6 @@ class TestIntegration(unittest.TestCase):
         self.assertEqual(response.status_code, 401)
 
     def test_login_success_returns_tokens(self) -> Any:
-        """Test successful login returns access and refresh tokens."""
         self.client.post(
             "/api/auth/register",
             json={
@@ -166,17 +151,14 @@ class TestIntegration(unittest.TestCase):
         self.assertIn("refresh_token", data["tokens"])
 
     def test_profile_requires_auth(self) -> Any:
-        """Test that /api/profile requires a JWT."""
         response = self.client.get("/api/profile")
         self.assertIn(response.status_code, (401, 422))
 
     def test_credit_history_requires_auth(self) -> Any:
-        """Test that /api/credit/history requires a JWT."""
         response = self.client.get("/api/credit/history")
         self.assertIn(response.status_code, (401, 422))
 
     def test_calculate_credit_score_requires_auth(self) -> Any:
-        """Test that credit score calculation requires a JWT."""
         response = self.client.post(
             "/api/credit/calculate-score",
             json={"walletAddress": "0x742d35Cc6634C0532925a3b844Bc454e4438f44e"},
@@ -185,7 +167,6 @@ class TestIntegration(unittest.TestCase):
         self.assertIn(response.status_code, (401, 422))
 
     def test_loan_apply_requires_auth(self) -> Any:
-        """Test that loan application requires a JWT."""
         response = self.client.post(
             "/api/loans/apply",
             json={
@@ -198,7 +179,6 @@ class TestIntegration(unittest.TestCase):
         self.assertIn(response.status_code, (401, 422))
 
     def test_full_registration_login_profile_flow(self) -> Any:
-        """End-to-end: register → login → get profile."""
         email = "flow@example.com"
         password = "FlowTest123!"
 
@@ -228,7 +208,6 @@ class TestIntegration(unittest.TestCase):
         self.assertIn("data", profile_data)
 
     def test_loan_calculate_with_auth(self) -> Any:
-        """Test loan calculation with valid JWT."""
         token = self._register_and_login("loan_calc@example.com")
         if not token:
             self.skipTest("Could not obtain auth token")
@@ -249,7 +228,6 @@ class TestIntegration(unittest.TestCase):
         self.assertIn("approval_probability", loan_data)
 
     def test_loan_calculation_math(self) -> Any:
-        """Test that loan calculations are mathematically correct."""
         token = self._register_and_login("loan_math@example.com")
         if not token:
             self.skipTest("Could not obtain auth token")
@@ -284,7 +262,6 @@ class TestIntegration(unittest.TestCase):
         )
 
     def test_credit_score_calculation_with_wallet(self) -> Any:
-        """Test credit score calculation requires wallet address."""
         token = self._register_and_login("wallet_test@example.com")
         if not token:
             self.skipTest("Could not obtain auth token")
@@ -295,13 +272,11 @@ class TestIntegration(unittest.TestCase):
             headers={"Authorization": f"Bearer {token}"},
             content_type="application/json",
         )
-        # Should fail without wallet address
         self.assertEqual(response.status_code, 400)
         data = json.loads(response.data)
         self.assertFalse(data["success"])
 
     def test_credit_history_empty_for_new_user(self) -> Any:
-        """Test credit history is empty for new user."""
         token = self._register_and_login("hist_test@example.com")
         if not token:
             self.skipTest("Could not obtain auth token")
@@ -317,7 +292,6 @@ class TestIntegration(unittest.TestCase):
         self.assertEqual(data["data"]["history"], [])
 
     def test_logout_invalidates_session(self) -> Any:
-        """Test that logout works with a valid token."""
         token = self._register_and_login("logout_test@example.com")
         if not token:
             self.skipTest("Could not obtain auth token")

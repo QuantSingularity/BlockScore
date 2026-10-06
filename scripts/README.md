@@ -22,7 +22,7 @@ These scripts operate on the project's real components:
 | Component    | Path              | Stack                                                                                                                                     |
 | ------------ | ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
 | `backend`    | `code/backend`    | Python / Flask (primary; also ships a minimal `package.json` for a few standalone Node.js service modules - see `code/backend/config.js`) |
-| `ai`         | `code/ai_models`  | Python (training deps in `training_scripts/requirements.txt`)                                                                             |
+| `ai`         | `code/ai_models`  | Python (dependencies in `requirements.txt`)                                                                                               |
 | `blockchain` | `code/blockchain` | Solidity, Hardhat (see `hardhat.config.js` and `package.json`)                                                                            |
 | `frontend`   | `web-frontend`    | React (Vite)                                                                                                                              |
 | `mobile`     | `mobile-frontend` | React Native (CLI, not Expo)                                                                                                              |

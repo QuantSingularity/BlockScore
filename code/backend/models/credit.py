@@ -1,7 +1,3 @@
-"""
-Credit scoring models for BlockScore Backend
-"""
-
 import enum
 import json
 import uuid

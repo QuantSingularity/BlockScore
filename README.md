@@ -4,7 +4,7 @@
 
 ## Blockchain-Based Credit Scoring Platform
 
-BlockScore is a credit scoring platform: a Flask backend for auth, credit scoring, loan applications, and blockchain-anchored records, paired with a React web dashboard and a React Native mobile app. Credit scores are computed from a real, multi-factor rule-based engine (payment history, utilization, length of history, credit mix, and more), with an optional trained model that's used when present and falls back to the rule-based engine when it isn't.
+BlockScore is a credit scoring platform: a Flask backend for auth, credit scoring, loan applications, and blockchain-anchored records, paired with a React web dashboard and a React Native mobile app. Credit scores are computed from a real, multi-factor rule-based engine (payment history, utilization, length of history, credit mix, and more), with an XGBoost model served by the `blockscore_ai` package in `code/ai_models` that is used when reachable and falls back to the rule-based engine when it is not.
 
 <div align="center">
   <img src="docs/images/homepage.bmp" alt="BlockScore HomePage" width="100%">
@@ -28,7 +28,7 @@ BlockScore is a credit scoring platform: a Flask backend for auth, credit scorin
 
 ## Overview
 
-BlockScore demonstrates a credit-scoring workflow across a real, runnable codebase. The live Flask backend, Hardhat smart contracts, the `code/ai_models` scoring service, and both frontends are wired and covered by tests. The Flask backend calls `code/ai_models`'s Flask API over HTTP (via `AI_MODEL_URL`) to score credit history, falling back to a locally loaded copy of the trained model, and then to the rule-based engine, if that service is unreachable.
+BlockScore demonstrates a credit-scoring workflow across a real, runnable codebase. The live Flask backend, Hardhat smart contracts, the `code/ai_models` scoring service, and both frontends are wired and covered by tests. The Flask backend calls `code/ai_models`'s Flask API over HTTP (via `AI_MODEL_URL`) to score credit history, and falls back to the rule-based engine if that service is unreachable or returns an invalid response. Each stored score records which path produced it.
 
 ## Project Structure
 
@@ -44,8 +44,8 @@ BlockScore/
 │   ├── blockchain/             # Hardhat project
 │   │   ├── contracts/          # CreditScore(V2), LoanContract(V2), GovernanceToken
 │   │   └── tests/              # Hardhat test suite
-│   └── ai_models/              # Credit-scoring model training and its own Flask
-│                               # serving API, called by code/backend over HTTP
+│   └── ai_models/              # blockscore_ai package (src layout): api, scoring,
+│                               # training, research; served over HTTP to code/backend
 ├── web-frontend/               # React (Vite) dashboard
 ├── mobile-frontend/            # React Native app
 ├── infrastructure/             # Docker, Kubernetes, Terraform, Ansible, monitoring
@@ -58,33 +58,33 @@ BlockScore/
 
 ### Application tier (wired and tested)
 
-| Component            | Details                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| :------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **API**              | A Flask application with all routes defined directly in `app.py`: health, auth (register, login, logout, refresh), credit (score calculation, history), loans (apply, calculate, list, anchor to blockchain), and profile.                                                                                                                                                                                                      |
-| **Auth**             | JWT sessions with bcrypt password hashing, plus a real MFA service. `SECRET_KEY` and `JWT_SECRET_KEY` both fall back to static placeholder values with no check that rejects them in production.                                                                                                                                                                                                                                |
-| **Credit scoring**   | A multi-factor rule-based engine computing payment history, credit utilization, length of history, credit mix, new credit, income stability, and debt-to-income factors, combined into a score. Also calls the `code/ai_models` Flask service over HTTP (`AI_MODEL_URL`) for a model-based score, falling back to a locally loaded `credit_scoring_model.pkl` and then to the rule-based engine if that service is unreachable. |
-| **Background jobs**  | A real Celery app (`utils/background_jobs.py`), backed by Redis and run through its own `celery_worker` container in Docker Compose.                                                                                                                                                                                                                                                                                            |
-| **AI model service** | `code/ai_models` is a separate Flask API (its own Dockerfile and `ai_model` service in `docker-compose.yml`) for training and serving the credit-scoring model; `code/backend` calls it over HTTP for live scoring.                                                                                                                                                                                                             |
-| **Smart contracts**  | Hardhat-managed Solidity contracts: `CreditScore` and `CreditScoreV2`, `LoanContract` and `LoanContractV2`, and a `GovernanceToken`, read and written via a genuine web3.py-backed blockchain service.                                                                                                                                                                                                                          |
-| **Web dashboard**    | React app (plain JavaScript, Vite, Material-UI, Chart.js) covering the dashboard, credit score, loans, profile, and authentication screens.                                                                                                                                                                                                                                                                                     |
-| **Mobile app**       | React Native app (TypeScript) covering Dashboard, Login, Profile, and Register screens, with Redux Toolkit for state, React Navigation, and React Native Elements (`@rneui`) for UI components.                                                                                                                                                                                                                                 |
+| Component            | Details                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| :------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **API**              | A Flask application with all routes defined directly in `app.py`: health, auth (register, login, logout, refresh), credit (score calculation, history), loans (apply, calculate, list, anchor to blockchain), and profile.                                                                                                                                                                                                                                                                       |
+| **Auth**             | JWT sessions with bcrypt password hashing, plus a real MFA service. `SECRET_KEY` and `JWT_SECRET_KEY` both fall back to static placeholder values with no check that rejects them in production.                                                                                                                                                                                                                                                                                                 |
+| **Credit scoring**   | A multi-factor rule-based engine computing payment history, credit utilization, length of history, credit mix, new credit, income stability, and debt-to-income factors, combined into a score. Also calls the `code/ai_models` Flask service over HTTP (`AI_MODEL_URL`) for a model-based score, with retries and a circuit breaker, and falls back to the rule-based engine if that service is unreachable. Responses include the scoring source, model version, confidence, and key insights. |
+| **Background jobs**  | A real Celery app (`utils/background_jobs.py`), backed by Redis and run through its own `celery_worker` container in Docker Compose.                                                                                                                                                                                                                                                                                                                                                             |
+| **AI model service** | `code/ai_models` is a separate Flask API (its own Dockerfile and `ai_model` service in `docker-compose.yml`) for training and serving the credit-scoring model; `code/backend` calls it over HTTP for live scoring.                                                                                                                                                                                                                                                                              |
+| **Smart contracts**  | Hardhat-managed Solidity contracts: `CreditScore` and `CreditScoreV2`, `LoanContract` and `LoanContractV2`, and a `GovernanceToken`, read and written via a genuine web3.py-backed blockchain service.                                                                                                                                                                                                                                                                                           |
+| **Web dashboard**    | React app (plain JavaScript, Vite, Material-UI, Chart.js) covering the dashboard, credit score, loans, profile, and authentication screens.                                                                                                                                                                                                                                                                                                                                                      |
+| **Mobile app**       | React Native app (TypeScript) covering Dashboard, Login, Profile, and Register screens, with Redux Toolkit for state, React Navigation, and React Native Elements (`@rneui`) for UI components.                                                                                                                                                                                                                                                                                                  |
 
 ## Technology Stack
 
-| Area                | Technology                                                                                             |
-| :------------------ | :----------------------------------------------------------------------------------------------------- |
-| Blockchain          | Solidity, OpenZeppelin, Hardhat                                                                        |
-| Backend API         | Python 3.11+, Flask, Flask-SQLAlchemy, Gunicorn                                                        |
-| Auth                | PyJWT, bcrypt, an in-house MFA service                                                                 |
-| Data layer          | SQLAlchemy 2, PostgreSQL (SQLite for local development), Redis                                         |
-| Background jobs     | Celery                                                                                                 |
-| ML (credit scoring) | scikit-learn, XGBoost, SHAP for explainability; a rule-based fallback when no trained model is present |
-| Web frontend        | React 18, JavaScript, Vite, Material-UI (MUI), Emotion, Chart.js, axios                                |
-| Mobile frontend     | React Native, TypeScript, Redux Toolkit, React Navigation, React Native Elements (`@rneui`)            |
-| Infrastructure      | Docker, Docker Compose, Kubernetes, Terraform, Ansible                                                 |
-| Monitoring          | Prometheus, Grafana                                                                                    |
-| CI/CD               | GitHub Actions                                                                                         |
-| Testing             | pytest (backend), Hardhat (contracts), Vitest (web), Jest (mobile)                                     |
+| Area                | Technology                                                                                                  |
+| :------------------ | :---------------------------------------------------------------------------------------------------------- |
+| Blockchain          | Solidity, OpenZeppelin, Hardhat                                                                             |
+| Backend API         | Python 3.11+, Flask, Flask-SQLAlchemy, Gunicorn                                                             |
+| Auth                | PyJWT, bcrypt, an in-house MFA service                                                                      |
+| Data layer          | SQLAlchemy 2, PostgreSQL (SQLite for local development), Redis                                              |
+| Background jobs     | Celery                                                                                                      |
+| ML (credit scoring) | scikit-learn, XGBoost, SHAP for explainability; a rule-based fallback when the model service is unavailable |
+| Web frontend        | React 18, JavaScript, Vite, Material-UI (MUI), Emotion, Chart.js, axios                                     |
+| Mobile frontend     | React Native, TypeScript, Redux Toolkit, React Navigation, React Native Elements (`@rneui`)                 |
+| Infrastructure      | Docker, Docker Compose, Kubernetes, Terraform, Ansible                                                      |
+| Monitoring          | Prometheus, Grafana                                                                                         |
+| CI/CD               | GitHub Actions                                                                                              |
+| Testing             | pytest (backend), Hardhat (contracts), Vitest (web), Jest (mobile)                                          |
 
 ## Architecture
 
@@ -95,7 +95,7 @@ Clients
                                                         ▼
 Backend (Flask, all routes in app.py)
   ├── Routes    health, auth, credit, loans, profile
-  ├── Services   credit (rule-based + optional trained model), blockchain (web3.py),
+  ├── Services   credit (rule-based + AI model service client), blockchain (web3.py),
   │              auth, mfa, compliance, audit
   ├── Background   Celery worker (Redis-backed)
   └── Data layer     PostgreSQL (SQLAlchemy), SQLite for local dev
@@ -104,9 +104,9 @@ Blockchain (Hardhat / Solidity)
   CreditScore · CreditScoreV2 · LoanContract · LoanContractV2 · GovernanceToken
 
 AI model service (code/ai_models)
-  Training script + Flask serving API; code/backend calls it over HTTP
-  (AI_MODEL_URL), falling back to a local .pkl file and then rule-based
-  scoring if the service is unreachable
+  blockscore_ai package: training CLI + Flask serving API; code/backend calls
+  it over HTTP (AI_MODEL_URL), falling back to rule-based scoring if the
+  service is unreachable
 ```
 
 See [docs/architecture.md](docs/architecture.md) for detail.

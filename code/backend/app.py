@@ -1,15 +1,9 @@
-"""
-BlockScore Backend - Production-Ready Flask Application
-Financial Industry Standards Implementation
-"""
-
 import logging
+import os
 import traceback
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional, Tuple
-
-import compat_stubs  # noqa: F401 - must be first
 
 try:
     import redis
@@ -37,6 +31,7 @@ from models.blockchain import ContractType
 from models.credit import CreditHistory, CreditScore
 from models.loan import LoanApplication, LoanApplicationSchema, LoanStatus, LoanType
 from models.user import User, UserLoginSchema, UserProfileSchema, UserRegistrationSchema
+from services.ai_client import AIModelClient
 from services.audit_service import AuditService
 from services.auth_service import AuthService
 from services.blockchain_service import BlockchainService
@@ -49,9 +44,41 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+PLACEHOLDER_SECRETS = {
+    "",
+    "change-me-in-production",
+    "change-me-jwt-in-production",
+    "dev-secret-key-change-in-production",
+    "jwt-secret-key-change-in-production",
+}
+
+
+def _parse_origins(raw: Any) -> Any:
+    if isinstance(raw, (list, tuple, set)):
+        return list(raw)
+    value = (raw or "").strip()
+    if value in ("", "*"):
+        return value or []
+    return [item.strip() for item in value.split(",") if item.strip()]
+
+
+def _validate_production_secrets(app: Flask) -> None:
+    if app.config.get("TESTING") or app.config.get("FLASK_ENV") != "production":
+        return
+    weak = [
+        key
+        for key in ("SECRET_KEY", "JWT_SECRET_KEY")
+        if app.config.get(key) in PLACEHOLDER_SECRETS
+        or len(str(app.config.get(key))) < 32
+    ]
+    if weak:
+        raise RuntimeError(
+            f"Refusing to start in production with weak or placeholder secrets: {', '.join(weak)}. "
+            "Set strong values of at least 32 characters."
+        )
+
 
 def create_app(config_name: Any = "default") -> Flask:
-    """Application factory pattern - accepts string name or dict of overrides"""
     app = Flask(__name__)
     if isinstance(config_name, dict):
         config_class = get_config()
@@ -62,10 +89,16 @@ def create_app(config_name: Any = "default") -> Flask:
 
         env = config_name if config_name in config_map else "default"
         app.config.from_object(config_map[env])
+    _validate_production_secrets(app)
     db.init_app(app)
     ma.init_app(app)
     bcrypt.init_app(app)
-    CORS(app, origins=app.config.get("CORS_ORIGINS", "*"), supports_credentials=True)
+    cors_origins = _parse_origins(app.config.get("CORS_ORIGINS", "*"))
+    CORS(
+        app,
+        origins=cors_origins,
+        supports_credentials=cors_origins != "*",
+    )
     jwt = JWTManager(app)
     try:
         if _REDIS_AVAILABLE and redis:
@@ -90,9 +123,12 @@ def create_app(config_name: Any = "default") -> Flask:
         enabled=app.config.get("RATELIMIT_ENABLED", True),
     )
     auth_service = AuthService(db, bcrypt, redis_client)
-    credit_service = CreditScoringService(db)
+    app.extensions["blockscore_limiter"] = limiter
+    ai_client = AIModelClient.from_config(app.config)
+    credit_service = CreditScoringService(db, ai_client=ai_client)
     blockchain_service = BlockchainService(app.config)
     credit_service.blockchain_service = blockchain_service
+    app.extensions["credit_service"] = credit_service
     audit_service = AuditService(db)
     ComplianceService(db)
     blacklisted_tokens: set = set()
@@ -129,15 +165,6 @@ def create_app(config_name: Any = "default") -> Flask:
         )
 
     def _safe_jwt_identity() -> Optional[str]:
-        """Best-effort JWT identity lookup for audit logging.
-
-        get_jwt_identity() raises if the current request's JWT was never
-        successfully verified (missing, malformed, or expired token) - which
-        is expected for anonymous or failed-auth requests, not an error
-        worth logging. Swallowing just that lookup (rather than the whole
-        audit_service.log_api_request(...) call, as before) keeps the audit
-        trail intact for every request, including failed-auth ones.
-        """
         try:
             return get_jwt_identity()
         except Exception:
@@ -268,7 +295,6 @@ def create_app(config_name: Any = "default") -> Flask:
 
     @app.route("/api/health", methods=["GET"])
     def health_check() -> Tuple[Any, int]:
-        """Comprehensive health check endpoint"""
         try:
             db.session.execute(db.text("SELECT 1"))
             db_status = True
@@ -283,6 +309,7 @@ def create_app(config_name: Any = "default") -> Flask:
             except Exception as e:
                 app.logger.error(f"Redis health check failed: {e}")
         blockchain_status = blockchain_service.is_connected()
+        ai_model_status = credit_service.is_ai_service_available()
         is_healthy = db_status and (redis_status or not redis_client)
         return (
             jsonify(
@@ -299,14 +326,7 @@ def create_app(config_name: Any = "default") -> Flask:
                             else "down" if redis_client else "not_configured"
                         ),
                         "blockchain": "up" if blockchain_status else "down",
-                        "ai_model": (
-                            "up"
-                            if (
-                                credit_service.is_ai_service_available()
-                                or credit_service.is_model_loaded()
-                            )
-                            else "down"
-                        ),
+                        "ai_model": "up" if ai_model_status else "down",
                     },
                     "request_id": getattr(g, "request_id", None),
                 }
@@ -317,7 +337,6 @@ def create_app(config_name: Any = "default") -> Flask:
     @app.route("/api/auth/register", methods=["POST"])
     @limiter.limit("5 per minute")
     def register() -> Tuple[Any, int]:
-        """User registration endpoint"""
         try:
             if not request.json:
                 return (
@@ -332,7 +351,6 @@ def create_app(config_name: Any = "default") -> Flask:
                 )
             schema = UserRegistrationSchema()
             data = schema.load(request.json)
-            # Manual password validation (schema stub may not validate)
             if not data.get("password"):
                 return (
                     jsonify(
@@ -439,7 +457,6 @@ def create_app(config_name: Any = "default") -> Flask:
     @app.route("/api/auth/login", methods=["POST"])
     @limiter.limit(app.config["RATELIMIT_LOGIN"])
     def login() -> Tuple[Any, int]:
-        """User login endpoint"""
         try:
             schema = UserLoginSchema()
             data = schema.load(request.json)
@@ -537,7 +554,6 @@ def create_app(config_name: Any = "default") -> Flask:
     @app.route("/api/auth/logout", methods=["POST"])
     @jwt_required()
     def logout() -> Tuple[Any, int]:
-        """User logout endpoint"""
         try:
             user_id = get_jwt_identity()
             jti = get_jwt()["jti"]
@@ -567,7 +583,6 @@ def create_app(config_name: Any = "default") -> Flask:
     @app.route("/api/auth/refresh", methods=["POST"])
     @jwt_required(refresh=True)
     def refresh_token() -> Tuple[Any, int]:
-        """Refresh access token endpoint"""
         try:
             user_id = get_jwt_identity()
             jti = get_jwt()["jti"]
@@ -615,7 +630,6 @@ def create_app(config_name: Any = "default") -> Flask:
     @jwt_required()
     @limiter.limit("10 per minute")
     def calculate_credit_score() -> Tuple[Any, int]:
-        """Calculate credit score endpoint"""
         try:
             user_id = get_jwt_identity()
             data = request.json or {}
@@ -669,7 +683,6 @@ def create_app(config_name: Any = "default") -> Flask:
     @app.route("/api/credit/history", methods=["GET"])
     @jwt_required()
     def get_credit_history() -> Tuple[Any, int]:
-        """Get credit history endpoint"""
         try:
             user_id = get_jwt_identity()
             page = request.args.get("page", 1, type=int)
@@ -715,7 +728,6 @@ def create_app(config_name: Any = "default") -> Flask:
     @jwt_required()
     @limiter.limit("3 per hour")
     def apply_for_loan() -> Tuple[Any, int]:
-        """Loan application endpoint"""
         try:
             user_id = get_jwt_identity()
             schema = LoanApplicationSchema()
@@ -799,7 +811,6 @@ def create_app(config_name: Any = "default") -> Flask:
     @app.route("/api/loans/calculate", methods=["POST"])
     @jwt_required()
     def calculate_loan_terms() -> Tuple[Any, int]:
-        """Calculate loan terms endpoint"""
         try:
             user_id = get_jwt_identity()
             data = request.json or {}
@@ -865,7 +876,6 @@ def create_app(config_name: Any = "default") -> Flask:
     @app.route("/api/profile", methods=["GET"])
     @jwt_required()
     def get_profile() -> Tuple[Any, int]:
-        """Get user profile endpoint"""
 
         try:
             user_id = get_jwt_identity()
@@ -901,7 +911,6 @@ def create_app(config_name: Any = "default") -> Flask:
     @app.route("/api/profile", methods=["PUT"])
     @jwt_required()
     def update_profile() -> Tuple[Any, int]:
-        """Update the current user's profile endpoint"""
         try:
             user_id = get_jwt_identity()
             user = db.session.get(User, user_id)
@@ -981,7 +990,6 @@ def create_app(config_name: Any = "default") -> Flask:
     @app.route("/api/loans/applications", methods=["GET"])
     @jwt_required()
     def get_loan_applications() -> Tuple[Any, int]:
-        """List the current user's loan applications endpoint"""
         try:
             user_id = get_jwt_identity()
             page = request.args.get("page", 1, type=int)
@@ -1031,17 +1039,6 @@ def create_app(config_name: Any = "default") -> Flask:
     def record_loan_application_blockchain_tx(
         application_id: str,
     ) -> Tuple[Any, int]:
-        """Attach an on-chain transaction to an existing loan application.
-
-        LoanContractV2.submitLoanApplication() must be called directly by
-        the applicant's own wallet (it's EIP-712 signed by msg.sender, and
-        the backend can't produce that signature on a user's behalf - see
-        blockchain_service.submit_loan_agreement's docstring). So the
-        client (web-frontend/src/contexts/Web3Context.js) submits that
-        transaction itself, then calls this endpoint with the resulting
-        transaction hash so it's linked to the off-chain application
-        record and tracked in the BlockchainTransaction ledger.
-        """
         try:
             user_id = get_jwt_identity()
             application = LoanApplication.query.filter_by(
@@ -1138,4 +1135,8 @@ if __name__ == "__main__":
     logging.basicConfig(
         level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s"
     )
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    app.run(
+        host=os.getenv("HOST", "127.0.0.1"),
+        port=int(os.getenv("PORT", "5000")),
+        debug=os.getenv("FLASK_DEBUG", "0") == "1",
+    )

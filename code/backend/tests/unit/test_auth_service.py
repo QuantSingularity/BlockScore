@@ -4,11 +4,7 @@ import sys
 sys.path.insert(
     0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 )
-import compat_stubs  # noqa
 
-"""
-Unit tests for Authentication Service
-"""
 
 from datetime import datetime, timedelta, timezone
 from typing import Any
@@ -19,12 +15,10 @@ from models.user import User, UserSession
 
 
 class TestAuthenticationService:
-    """Test cases for AuthenticationService"""
 
     def test_register_user_success(
         self, auth_service: Any, db: Any, sample_user_data: Any
     ) -> Any:
-        """Test successful user registration"""
         result = auth_service.register_user(sample_user_data)
         assert result["success"] is True
         assert "user_id" in result
@@ -38,7 +32,6 @@ class TestAuthenticationService:
     def test_register_user_duplicate_email(
         self, auth_service: Any, db: Any, sample_user: Any
     ) -> Any:
-        """Test registration with duplicate email"""
         user_data = {
             "email": sample_user.email,
             "password": "NewPassword123!",
@@ -50,7 +43,6 @@ class TestAuthenticationService:
         assert "already exists" in result["message"].lower()
 
     def test_register_user_invalid_email(self, auth_service: Any, db: Any) -> Any:
-        """Test registration with invalid email"""
         user_data = {
             "email": "invalid-email",
             "password": "Password123!",
@@ -62,7 +54,6 @@ class TestAuthenticationService:
         assert "invalid" in result["message"].lower()
 
     def test_register_user_weak_password(self, auth_service: Any, db: Any) -> Any:
-        """Test registration with weak password"""
         user_data = {
             "email": "test@example.com",
             "password": "123",
@@ -76,7 +67,6 @@ class TestAuthenticationService:
     def test_authenticate_user_success(
         self, auth_service: Any, db: Any, sample_user: Any
     ) -> Any:
-        """Test successful user authentication"""
         with patch.object(auth_service, "_verify_password", return_value=True):
             result = auth_service.authenticate_user(
                 sample_user.email, "correct_password"
@@ -87,7 +77,6 @@ class TestAuthenticationService:
         assert "refresh_token" in result
 
     def test_authenticate_user_invalid_email(self, auth_service: Any, db: Any) -> Any:
-        """Test authentication with invalid email"""
         result = auth_service.authenticate_user("nonexistent@example.com", "password")
         assert result["success"] is False
         assert "invalid" in result["message"].lower()
@@ -95,7 +84,6 @@ class TestAuthenticationService:
     def test_authenticate_user_wrong_password(
         self, auth_service: Any, db: Any, sample_user: Any
     ) -> Any:
-        """Test authentication with wrong password"""
         with patch.object(auth_service, "_verify_password", return_value=False):
             result = auth_service.authenticate_user(sample_user.email, "wrong_password")
         assert result["success"] is False
@@ -104,7 +92,6 @@ class TestAuthenticationService:
     def test_authenticate_user_inactive_account(
         self, auth_service: Any, db: Any, sample_user: Any
     ) -> Any:
-        """Test authentication with inactive account"""
         sample_user.is_active = False
         db.session.commit()
         with patch.object(auth_service, "_verify_password", return_value=True):
@@ -117,7 +104,6 @@ class TestAuthenticationService:
     def test_authenticate_user_unverified_email(
         self, auth_service: Any, db: Any, sample_user: Any
     ) -> Any:
-        """Test authentication with unverified email"""
         sample_user.email_verified = False
         db.session.commit()
         with patch.object(auth_service, "_verify_password", return_value=True):
@@ -130,7 +116,6 @@ class TestAuthenticationService:
     def test_validate_token_success(
         self, auth_service: Any, db: Any, sample_user: Any
     ) -> Any:
-        """Test successful token validation"""
         token = auth_service._generate_access_token(sample_user.id)
         result = auth_service.validate_token(token)
         assert result["valid"] is True
@@ -139,7 +124,6 @@ class TestAuthenticationService:
     def test_validate_token_expired(
         self, auth_service: Any, db: Any, sample_user: Any
     ) -> Any:
-        """Test validation of expired token"""
         import time
 
         import jwt as pyjwt
@@ -157,7 +141,6 @@ class TestAuthenticationService:
         assert "expired" in result["message"].lower()
 
     def test_validate_token_invalid(self, auth_service: Any, db: Any) -> Any:
-        """Test validation of invalid token"""
         result = auth_service.validate_token("invalid_token")
         assert result["valid"] is False
         assert "invalid" in result["message"].lower()
@@ -165,7 +148,6 @@ class TestAuthenticationService:
     def test_refresh_token_success(
         self, auth_service: Any, db: Any, sample_user: Any
     ) -> Any:
-        """Test successful token refresh"""
         session = UserSession(
             user_id=sample_user.id,
             session_token="test_refresh_token",
@@ -179,7 +161,6 @@ class TestAuthenticationService:
         assert "refresh_token" in result
 
     def test_refresh_token_invalid(self, auth_service: Any, db: Any) -> Any:
-        """Test refresh with invalid token"""
         result = auth_service.refresh_token("invalid_refresh_token")
         assert result["success"] is False
         assert "invalid" in result["message"].lower()
@@ -187,7 +168,6 @@ class TestAuthenticationService:
     def test_refresh_token_expired(
         self, auth_service: Any, db: Any, sample_user: Any
     ) -> Any:
-        """Test refresh with expired token"""
         session = UserSession(
             user_id=sample_user.id,
             session_token="expired_refresh_token",
@@ -202,7 +182,6 @@ class TestAuthenticationService:
     def test_logout_user_success(
         self, auth_service: Any, db: Any, sample_user: Any
     ) -> Any:
-        """Test successful user logout"""
         session = UserSession(
             user_id=sample_user.id,
             session_token="test_session_token",
@@ -220,7 +199,6 @@ class TestAuthenticationService:
     def test_logout_user_invalid_session(
         self, auth_service: Any, db: Any, sample_user: Any
     ) -> Any:
-        """Test logout with invalid session"""
         result = auth_service.logout_user(sample_user.id, "invalid_session_token")
         assert result["success"] is False
         assert "invalid" in result["message"].lower()
@@ -228,7 +206,6 @@ class TestAuthenticationService:
     def test_change_password_success(
         self, auth_service: Any, db: Any, sample_user: Any
     ) -> Any:
-        """Test successful password change"""
         with patch.object(auth_service, "_verify_password", return_value=True):
             with patch.object(
                 auth_service, "_hash_password", return_value="new_hashed_password"
@@ -243,7 +220,6 @@ class TestAuthenticationService:
     def test_change_password_wrong_current(
         self, auth_service: Any, db: Any, sample_user: Any
     ) -> Any:
-        """Test password change with wrong current password"""
         with patch.object(auth_service, "_verify_password", return_value=False):
             result = auth_service.change_password(
                 sample_user.id, "wrong_password", "NewPassword123!"
@@ -254,7 +230,6 @@ class TestAuthenticationService:
     def test_change_password_weak_new_password(
         self, auth_service: Any, db: Any, sample_user: Any
     ) -> Any:
-        """Test password change with weak new password"""
         with patch.object(auth_service, "_verify_password", return_value=True):
             result = auth_service.change_password(sample_user.id, "old_password", "123")
         assert result["success"] is False
@@ -263,7 +238,6 @@ class TestAuthenticationService:
     def test_reset_password_request_success(
         self, auth_service: Any, db: Any, sample_user: Any
     ) -> Any:
-        """Test successful password reset request"""
         result = auth_service.request_password_reset(sample_user.email)
         assert result["success"] is True
         assert "reset_token" in result
@@ -274,7 +248,6 @@ class TestAuthenticationService:
     def test_reset_password_request_invalid_email(
         self, auth_service: Any, db: Any
     ) -> Any:
-        """Test password reset request with invalid email"""
         result = auth_service.request_password_reset("nonexistent@example.com")
         assert result["success"] is False
         assert "not found" in result["message"].lower()
@@ -282,7 +255,6 @@ class TestAuthenticationService:
     def test_reset_password_success(
         self, auth_service: Any, db: Any, sample_user: Any
     ) -> Any:
-        """Test successful password reset"""
         reset_token = "test_reset_token"
         sample_user.password_reset_token = reset_token
         sample_user.password_reset_expires = datetime.now(timezone.utc) + timedelta(
@@ -300,7 +272,6 @@ class TestAuthenticationService:
         assert updated_user.password_reset_expires is None
 
     def test_reset_password_invalid_token(self, auth_service: Any, db: Any) -> Any:
-        """Test password reset with invalid token"""
         result = auth_service.reset_password("invalid_token", "NewPassword123!")
         assert result["success"] is False
         assert "invalid" in result["message"].lower()
@@ -308,7 +279,6 @@ class TestAuthenticationService:
     def test_reset_password_expired_token(
         self, auth_service: Any, db: Any, sample_user: Any
     ) -> Any:
-        """Test password reset with expired token"""
         reset_token = "expired_reset_token"
         sample_user.password_reset_token = reset_token
         sample_user.password_reset_expires = datetime.now(timezone.utc) - timedelta(
@@ -322,7 +292,6 @@ class TestAuthenticationService:
     def test_enable_mfa_success(
         self, auth_service: Any, db: Any, sample_user: Any
     ) -> Any:
-        """Test successful MFA enablement"""
         result = auth_service.enable_mfa(sample_user.id)
         assert result["success"] is True
         assert "secret" in result
@@ -333,7 +302,6 @@ class TestAuthenticationService:
     def test_verify_mfa_success(
         self, auth_service: Any, db: Any, sample_user: Any
     ) -> Any:
-        """Test successful MFA verification"""
         sample_user.mfa_secret = "test_mfa_secret"
         sample_user.mfa_enabled = True
         db.session.commit()
@@ -347,7 +315,6 @@ class TestAuthenticationService:
     def test_verify_mfa_invalid_token(
         self, auth_service: Any, db: Any, sample_user: Any
     ) -> Any:
-        """Test MFA verification with invalid token"""
         sample_user.mfa_secret = "test_mfa_secret"
         sample_user.mfa_enabled = True
         db.session.commit()
@@ -361,7 +328,6 @@ class TestAuthenticationService:
     def test_disable_mfa_success(
         self, auth_service: Any, db: Any, sample_user: Any
     ) -> Any:
-        """Test successful MFA disablement"""
         sample_user.mfa_secret = "test_mfa_secret"
         sample_user.mfa_enabled = True
         db.session.commit()
@@ -377,7 +343,6 @@ class TestAuthenticationService:
     def test_get_user_sessions(
         self, auth_service: Any, db: Any, sample_user: Any
     ) -> Any:
-        """Test getting user sessions"""
         session1 = UserSession(
             user_id=sample_user.id,
             session_token="token1",
@@ -402,7 +367,6 @@ class TestAuthenticationService:
     def test_revoke_session_success(
         self, auth_service: Any, db: Any, sample_user: Any
     ) -> Any:
-        """Test successful session revocation"""
         session = UserSession(
             user_id=sample_user.id,
             session_token="test_token",
@@ -416,7 +380,6 @@ class TestAuthenticationService:
         assert updated_session.is_active is False
 
     def test_audit_logging(self, auth_service: Any, db: Any, sample_user: Any) -> Any:
-        """Test that authentication events are logged"""
         with patch.object(auth_service, "_verify_password", return_value=True):
             auth_service.authenticate_user(sample_user.email, "correct_password")
         audit_logs = AuditLog.query.filter_by(user_id=sample_user.id).all()
@@ -427,7 +390,6 @@ class TestAuthenticationService:
         assert login_log is not None
 
     def test_password_validation(self, auth_service: Any) -> Any:
-        """Test password validation rules"""
         assert auth_service._validate_password("StrongPass123!")["valid"] is True
         assert auth_service._validate_password("AnotherGood1@")["valid"] is True
         assert auth_service._validate_password("weak")["valid"] is False
@@ -437,7 +399,6 @@ class TestAuthenticationService:
         assert auth_service._validate_password("short1!")["valid"] is False
 
     def test_email_validation(self, auth_service: Any) -> Any:
-        """Test email validation"""
         assert auth_service._validate_email("test@example.com") is True
         assert auth_service._validate_email("user.name+tag@domain.co.uk") is True
         assert auth_service._validate_email("invalid-email") is False
@@ -446,7 +407,6 @@ class TestAuthenticationService:
         assert auth_service._validate_email("user@domain") is False
 
     def test_rate_limiting(self, auth_service: Any, db: Any, sample_user: Any) -> Any:
-        """Test authentication rate limiting via account lockout"""
         with patch.object(auth_service, "_verify_password", return_value=False):
             for _ in range(6):
                 auth_service.authenticate_user(sample_user.email, "wrong_password")
@@ -455,7 +415,6 @@ class TestAuthenticationService:
                 sample_user.email, "correct_password"
             )
         assert result["success"] is False
-        # After 5+ failed attempts account is locked - message contains "lock" or "inactive" or "rate"
         assert any(
             word in result["message"].lower()
             for word in ("lock", "rate", "inactive", "temporarily", "attempt")
@@ -464,7 +423,6 @@ class TestAuthenticationService:
     def test_security_headers(
         self, auth_service: Any, db: Any, sample_user: Any
     ) -> Any:
-        """Test security-related functionality"""
         with patch.object(auth_service, "_verify_password", return_value=True):
             auth_service.change_password(sample_user.id, "old_pass", "NewPass123!")
         updated_user = db.session.get(User, sample_user.id)

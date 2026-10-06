@@ -1,7 +1,3 @@
-"""
-User models for BlockScore Backend
-"""
-
 import enum
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -229,9 +225,6 @@ class UserSession(db.Model):
 
 class UserRegistrationSchema(Schema):
     class Meta:
-        # Clients (mobile app in particular) send UI-only consent flags like
-        # terms_accepted/privacy_accepted that have no corresponding column.
-        # Ignore unrecognized fields instead of rejecting the whole request.
         unknown = EXCLUDE
 
     email = fields.Email(required=True, validate=validate.Length(max=255))

@@ -1,8 +1,3 @@
-"""
-Background Job Manager for BlockScore Backend
-Celery-based background job processing for scalability
-"""
-
 import logging
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -20,20 +15,10 @@ except ImportError:
     _CELERY_AVAILABLE = False
 
 
-# Module-level Celery instance used by all task decorators
 celery_app = Celery("blockscore_jobs") if _CELERY_AVAILABLE else None
 
 
 def _blockchain_service_config() -> Dict[str, Any]:
-    """Build a dict-like config for BlockchainService.
-
-    The blockchain tasks below are plain Celery tasks, not Flask request
-    handlers, so they don't have access to `app.config`. BlockchainService
-    only needs `.get(key)`, so this reconstructs an equivalent dict
-    straight from the same Config class Flask itself loads
-    (`config.get_config()`), picking up every BLOCKCHAIN_*/*_CONTRACT_ADDRESS
-    setting automatically instead of hardcoding a subset here.
-    """
     try:
         from config import get_config
 
@@ -51,8 +36,13 @@ def _blockchain_service_config() -> Dict[str, Any]:
         return {}
 
 
+def _flask_app() -> Any:
+    from app import app as flask_app
+
+    return flask_app
+
+
 class JobManager:
-    """Background job manager using Celery"""
 
     def __init__(self, app_config: Dict[str, Any]) -> None:
         self.config = app_config
@@ -61,7 +51,6 @@ class JobManager:
         self.job_registry = {}
 
     def _create_celery_app(self) -> Any:
-        """Create and configure Celery application"""
         if not _CELERY_AVAILABLE:
             self.logger.warning("Celery not installed; background jobs disabled")
             return None
@@ -125,7 +114,6 @@ class JobManager:
         countdown: int = None,
         eta: datetime = None,
     ) -> str:
-        """Submit a background job"""
         try:
             args = args or []
             kwargs = kwargs or {}
@@ -150,7 +138,6 @@ class JobManager:
             raise e
 
     def get_job_status(self, job_id: str) -> Dict[str, Any]:
-        """Get job status and result"""
         try:
             result = AsyncResult(job_id, app=self.celery)
             job_info = self.job_registry.get(job_id, {})
@@ -174,7 +161,6 @@ class JobManager:
             return {"job_id": job_id, "status": "UNKNOWN", "error": str(e)}
 
     def cancel_job(self, job_id: str) -> bool:
-        """Cancel a pending or running job"""
         try:
             result = AsyncResult(job_id, app=self.celery)
             result.revoke(terminate=True)
@@ -187,7 +173,6 @@ class JobManager:
             return False
 
     def get_queue_stats(self) -> Dict[str, Any]:
-        """Get queue statistics"""
         try:
             inspect = self.celery.control.inspect()
             active_tasks = inspect.active()
@@ -222,7 +207,6 @@ class JobManager:
             return {"error": str(e)}
 
     def get_worker_stats(self) -> Dict[str, Any]:
-        """Get worker statistics"""
         try:
             inspect = self.celery.control.inspect()
             stats = inspect.stats()
@@ -246,7 +230,6 @@ class JobManager:
         args: List = None,
         kwargs: Dict = None,
     ) -> bool:
-        """Schedule a recurring job"""
         try:
             beat_schedule = {
                 name: {
@@ -264,7 +247,6 @@ class JobManager:
             return False
 
     def cleanup_completed_jobs(self, older_than_hours: int = 24) -> int:
-        """Clean up completed job records"""
         try:
             cutoff_time = datetime.now(timezone.utc) - timedelta(hours=older_than_hours)
             cleaned_count = 0
@@ -287,7 +269,6 @@ class JobManager:
             return 0
 
     def health_check(self) -> Dict[str, Any]:
-        """Perform health check on job system"""
         health = {
             "broker_connected": False,
             "workers_available": False,
@@ -323,22 +304,18 @@ class JobManager:
 
 
 class BaseTask(Task):
-    """Base task class with common functionality"""
 
     def on_failure(
         self, exc: Any, task_id: Any, args: Any, kwargs: Any, einfo: Any
     ) -> Any:
-        """Handle task failure"""
         logging.error(f"Task {task_id} failed: {exc}")
 
     def on_success(self, retval: Any, task_id: Any, args: Any, kwargs: Any) -> Any:
-        """Handle task success"""
         logging.info(f"Task {task_id} completed successfully")
 
     def on_retry(
         self, exc: Any, task_id: Any, args: Any, kwargs: Any, einfo: Any
     ) -> Any:
-        """Handle task retry"""
         logging.warning(f"Task {task_id} retrying due to: {exc}")
 
 
@@ -350,18 +327,27 @@ if celery_app is not None:
     def calculate_credit_score_async(
         self, user_id: str, wallet_address: Optional[str] = None
     ) -> Any:
-        """Asynchronous credit score calculation"""
         try:
             from models import db
+            from services.ai_client import AIModelClient
             from services.credit_service import CreditScoringService
 
-            credit_service = CreditScoringService(db)
-            result = credit_service.calculate_credit_score(
-                user_id, wallet_address, force_recalculation=True
-            )
+            flask_app = _flask_app()
+            with flask_app.app_context():
+                credit_service = CreditScoringService(
+                    db, ai_client=AIModelClient.from_config(flask_app.config)
+                )
+                result = credit_service.calculate_credit_score(
+                    user_id, wallet_address, force_recalculation=True
+                )
+            if result.get("error") == "User not found":
+                return {"user_id": user_id, "error": result["error"]}
+            if "error" in result:
+                raise RuntimeError(result["error"])
             return {
                 "user_id": user_id,
                 "credit_score": result.get("score"),
+                "scoring_source": result.get("scoring", {}).get("source"),
                 "calculated_at": datetime.now(timezone.utc).isoformat(),
             }
         except Exception as exc:
@@ -371,7 +357,6 @@ if celery_app is not None:
         bind=True, base=BaseTask, name="blockscore_jobs.credit_scoring.batch_calculate"
     )
     def batch_calculate_credit_scores(self, user_ids: List[str]) -> Any:
-        """Batch credit score calculation"""
         results = []
         for user_id in user_ids:
             try:
@@ -387,7 +372,6 @@ if celery_app is not None:
         name="blockscore_jobs.blockchain.update_pending_transactions",
     )
     def update_pending_transactions(self) -> Any:
-        """Update pending blockchain transactions"""
         try:
             from services.blockchain_service import BlockchainService
 
@@ -403,7 +387,6 @@ if celery_app is not None:
     def submit_blockchain_transaction(
         self, transaction_type: str, transaction_data: Dict[str, Any]
     ) -> Any:
-        """Submit blockchain transaction"""
         try:
             from services.blockchain_service import BlockchainService
 
@@ -426,13 +409,13 @@ if celery_app is not None:
         bind=True, base=BaseTask, name="blockscore_jobs.compliance.kyc_assessment"
     )
     def perform_kyc_assessment(self, user_id: str, kyc_level: str = "basic") -> Any:
-        """Perform KYC assessment"""
         try:
             from models import db
             from services.compliance_service import ComplianceService
 
-            compliance_service = ComplianceService(db)
-            result = compliance_service.perform_kyc_assessment(user_id, kyc_level)
+            with _flask_app().app_context():
+                compliance_service = ComplianceService(db)
+                result = compliance_service.perform_kyc_assessment(user_id, kyc_level)
             return result
         except Exception as exc:
             self.retry(exc=exc, countdown=60, max_retries=3)
@@ -443,13 +426,15 @@ if celery_app is not None:
     def perform_aml_screening(
         self, user_id: str, transaction_data: Dict[str, Any] = None
     ) -> Any:
-        """Perform AML screening"""
         try:
             from models import db
             from services.compliance_service import ComplianceService
 
-            compliance_service = ComplianceService(db)
-            result = compliance_service.perform_aml_screening(user_id, transaction_data)
+            with _flask_app().app_context():
+                compliance_service = ComplianceService(db)
+                result = compliance_service.perform_aml_screening(
+                    user_id, transaction_data
+                )
             return result
         except Exception as exc:
             self.retry(exc=exc, countdown=60, max_retries=3)
@@ -460,17 +445,19 @@ if celery_app is not None:
         name="blockscore_jobs.compliance.generate_daily_reports",
     )
     def generate_daily_compliance_reports(self) -> Any:
-        """Generate daily compliance reports"""
         try:
             from models import db
             from services.compliance_service import ComplianceService
 
-            compliance_service = ComplianceService(db)
             end_date = datetime.now(timezone.utc).replace(
                 hour=0, minute=0, second=0, microsecond=0
             )
             start_date = end_date - timedelta(days=1)
-            report = compliance_service.generate_compliance_report(start_date, end_date)
+            with _flask_app().app_context():
+                compliance_service = ComplianceService(db)
+                report = compliance_service.generate_compliance_report(
+                    start_date, end_date
+                )
             return {
                 "report_date": start_date.date().isoformat(),
                 "summary": report.get("summary", {}),
@@ -485,19 +472,19 @@ if celery_app is not None:
         name="blockscore_jobs.maintenance.cleanup_expired_sessions",
     )
     def cleanup_expired_sessions(self) -> Any:
-        """Clean up expired user sessions"""
         try:
             from models import db
             from models.user import UserSession
 
             cutoff_time = datetime.now(timezone.utc)
-            expired_sessions = UserSession.query.filter(
-                UserSession.expires_at < cutoff_time
-            ).all()
-            count = len(expired_sessions)
-            for session in expired_sessions:
-                db.session.delete(session)
-            db.session.commit()
+            with _flask_app().app_context():
+                expired_sessions = UserSession.query.filter(
+                    UserSession.expires_at < cutoff_time
+                ).all()
+                count = len(expired_sessions)
+                for session in expired_sessions:
+                    db.session.delete(session)
+                db.session.commit()
             return {
                 "cleaned_sessions": count,
                 "cleaned_at": datetime.now(timezone.utc).isoformat(),
@@ -509,13 +496,13 @@ if celery_app is not None:
         bind=True, base=BaseTask, name="blockscore_jobs.maintenance.system_health_check"
     )
     def system_health_check(self) -> Any:
-        """Perform system health check"""
         try:
             from models import db
             from utils.database import DatabaseOptimizer
 
-            db_optimizer = DatabaseOptimizer(db, db.engine)
-            db_health = db_optimizer.get_database_health()
+            with _flask_app().app_context():
+                db_optimizer = DatabaseOptimizer(db, db.engine)
+                db_health = db_optimizer.get_database_health()
             cache_health = {"available": False}
             blockchain_health = {"connected": False}
             health_report = {
@@ -533,11 +520,10 @@ if celery_app is not None:
 
     @celery_app.task(bind=True, base=BaseTask, name="blockscore_jobs.test.ping")
     def ping_task(self) -> Any:
-        """Simple ping task for testing"""
         return {"message": "pong", "timestamp": datetime.now(timezone.utc).isoformat()}
 
 else:
-    # Celery unavailable: define no-op stubs so imports don't fail
+
     def calculate_credit_score_async(*args: Any, **kwargs: Any) -> None:
         logging.warning("Celery unavailable; calculate_credit_score_async is a no-op")
 

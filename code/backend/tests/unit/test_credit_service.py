@@ -4,11 +4,7 @@ import sys
 sys.path.insert(
     0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 )
-import compat_stubs  # noqa
 
-"""
-Unit tests for Credit Scoring Service
-"""
 
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
@@ -20,12 +16,10 @@ from models.user import User, UserProfile
 
 
 class TestCreditScoringService:
-    """Test cases for CreditScoringService"""
 
     def test_calculate_credit_score_new_user(
         self, credit_service: Any, db: Any, sample_user: Any
     ) -> Any:
-        """Test credit score calculation for new user"""
         result = credit_service.calculate_credit_score(sample_user.id)
         assert "score" in result
         assert "factors" in result
@@ -39,7 +33,6 @@ class TestCreditScoringService:
     def test_calculate_credit_score_existing_user(
         self, credit_service: Any, db: Any, sample_user: Any, sample_credit_score: Any
     ) -> Any:
-        """Test credit score calculation for user with existing score"""
         sample_credit_score.score
         credit_history = CreditHistory(
             user_id=sample_user.id,
@@ -65,7 +58,6 @@ class TestCreditScoringService:
     def test_calculate_credit_score_with_blockchain(
         self, credit_service: Any, db: Any, sample_user: Any
     ) -> Any:
-        """Test credit score calculation with blockchain integration"""
         wallet_address = "0x1234567890123456789012345678901234567890"
         with patch.object(credit_service, "blockchain_service") as mock_blockchain:
             mock_blockchain.submit_credit_score_update.return_value = {
@@ -83,7 +75,6 @@ class TestCreditScoringService:
     def test_get_credit_score_current(
         self, credit_service: Any, db: Any, sample_user: Any, sample_credit_score: Any
     ) -> Any:
-        """Test getting current credit score"""
         result = credit_service.get_credit_score(sample_user.id)
         assert result is not None
         assert result["score"] == sample_credit_score.score
@@ -94,14 +85,12 @@ class TestCreditScoringService:
     def test_get_credit_score_nonexistent(
         self, credit_service: Any, db: Any, sample_user: Any
     ) -> Any:
-        """Test getting credit score for user without score"""
         result = credit_service.get_credit_score(sample_user.id)
         assert result is None
 
     def test_get_credit_score_history(
         self, credit_service: Any, db: Any, sample_user: Any
     ) -> Any:
-        """Test getting credit score history"""
         scores = []
         for i, score_value in enumerate([700, 720, 750]):
             credit_score = CreditScore(
@@ -121,7 +110,6 @@ class TestCreditScoringService:
     def test_add_credit_event_payment(
         self, credit_service: Any, db: Any, sample_user: Any
     ) -> Any:
-        """Test adding payment credit event"""
         event_data = {
             "amount": 500.0,
             "description": "Monthly payment",
@@ -140,7 +128,6 @@ class TestCreditScoringService:
     def test_add_credit_event_missed_payment(
         self, credit_service: Any, db: Any, sample_user: Any
     ) -> Any:
-        """Test adding missed payment event"""
         event_data = {
             "amount": 200.0,
             "description": "Missed payment",
@@ -158,7 +145,6 @@ class TestCreditScoringService:
     def test_add_credit_event_new_account(
         self, credit_service: Any, db: Any, sample_user: Any
     ) -> Any:
-        """Test adding new account event"""
         event_data = {
             "account_type": "credit_card",
             "credit_limit": 5000.0,
@@ -175,7 +161,6 @@ class TestCreditScoringService:
     def test_get_credit_factors_positive(
         self, credit_service: Any, db: Any, sample_user: Any
     ) -> Any:
-        """Test getting positive credit factors"""
         events = [
             CreditHistory(
                 user_id=sample_user.id,
@@ -197,7 +182,6 @@ class TestCreditScoringService:
     def test_get_credit_factors_negative(
         self, credit_service: Any, db: Any, sample_user: Any
     ) -> Any:
-        """Test getting negative credit factors"""
         events = [
             CreditHistory(
                 user_id=sample_user.id,
@@ -218,7 +202,6 @@ class TestCreditScoringService:
     def test_analyze_credit_trends(
         self, credit_service: Any, db: Any, sample_user: Any
     ) -> Any:
-        """Test credit trend analysis"""
         base_date = datetime.now(timezone.utc) - timedelta(days=180)
         scores = [680, 690, 710, 720, 750]
         for i, score in enumerate(scores):
@@ -240,7 +223,6 @@ class TestCreditScoringService:
     def test_get_credit_recommendations(
         self, credit_service: Any, db: Any, sample_user: Any
     ) -> Any:
-        """Test getting credit improvement recommendations"""
         credit_history = CreditHistory(
             user_id=sample_user.id,
             event_type=CreditEventType.PAYMENT_MISSED,
@@ -263,7 +245,6 @@ class TestCreditScoringService:
     def test_simulate_score_impact(
         self, credit_service: Any, db: Any, sample_user: Any, sample_credit_score: Any
     ) -> Any:
-        """Test simulating impact of credit events"""
         current_score = sample_credit_score.score
         positive_simulation = credit_service.simulate_score_impact(
             sample_user.id, CreditEventType.PAYMENT_MADE, {"amount": 500.0}
@@ -278,7 +259,6 @@ class TestCreditScoringService:
         assert negative_simulation["score_change"] < 0
 
     def test_bulk_score_calculation(self, credit_service: Any, db: Any) -> Any:
-        """Test bulk credit score calculation"""
         users = []
         for i in range(3):
             user = User(
@@ -303,7 +283,6 @@ class TestCreditScoringService:
     def test_credit_score_caching(
         self, credit_service: Any, db: Any, sample_user: Any, sample_credit_score: Any
     ) -> Any:
-        """Test credit score caching functionality"""
         credit_service.get_credit_score(sample_user.id)
         with patch.object(credit_service.cache, "get") as mock_cache_get:
             mock_cache_get.return_value = {
@@ -316,7 +295,6 @@ class TestCreditScoringService:
         assert result2["score"] == sample_credit_score.score
 
     def test_credit_score_validation(self, credit_service: Any) -> Any:
-        """Test credit score validation"""
         assert credit_service._validate_score(750) is True
         assert credit_service._validate_score(300) is True
         assert credit_service._validate_score(850) is True
@@ -327,7 +305,6 @@ class TestCreditScoringService:
     def test_ai_model_integration(
         self, credit_service: Any, db: Any, sample_user: Any
     ) -> Any:
-        """Test AI model integration for scoring"""
         with patch.object(credit_service, "_call_ai_model") as mock_ai:
             mock_ai.return_value = {
                 "score": 725,
@@ -348,7 +325,6 @@ class TestCreditScoringService:
     def test_credit_monitoring_alerts(
         self, credit_service: Any, db: Any, sample_user: Any, sample_credit_score: Any
     ) -> Any:
-        """Test credit monitoring and alerts"""
         original_score = sample_credit_score.score
         new_score = original_score - 50
         with patch.object(credit_service, "_send_alert") as mock_alert:
@@ -362,7 +338,6 @@ class TestCreditScoringService:
     def test_credit_report_generation(
         self, credit_service: Any, db: Any, sample_user: Any, sample_credit_score: Any
     ) -> Any:
-        """Test comprehensive credit report generation"""
         events = [
             CreditHistory(
                 user_id=sample_user.id,
@@ -388,7 +363,6 @@ class TestCreditScoringService:
         assert report["current_score"]["score"] == sample_credit_score.score
 
     def test_error_handling(self, credit_service: Any, db: Any) -> Any:
-        """Test error handling for invalid inputs"""
         result = credit_service.calculate_credit_score("non-existent-user-id")
         assert "error" in result
         result = credit_service.add_credit_event("user-id", "invalid_event_type", {})
@@ -397,7 +371,6 @@ class TestCreditScoringService:
     def test_performance_monitoring(
         self, credit_service: Any, db: Any, sample_user: Any
     ) -> Any:
-        """Test performance monitoring integration"""
         with patch.object(credit_service, "monitor") as mock_monitor:
             credit_service.calculate_credit_score(sample_user.id)
         mock_monitor.record_metric.assert_called()

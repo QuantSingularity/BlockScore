@@ -1,7 +1,3 @@
-"""
-Database models package for BlockScore Backend
-"""
-
 from extensions import db, ma
 
 from .audit import AuditLog, ComplianceRecord

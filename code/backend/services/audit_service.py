@@ -1,8 +1,3 @@
-"""
-Audit Service for BlockScore Backend
-Comprehensive audit logging and monitoring for financial compliance
-"""
-
 import json
 import logging
 import uuid
@@ -14,7 +9,6 @@ from models.audit import AuditEventType, AuditLog, AuditSeverity
 
 
 class AuditService:
-    """Comprehensive audit service for financial compliance and security monitoring"""
 
     def __init__(self, db: Any) -> None:
         self.db = db
@@ -53,7 +47,6 @@ class AuditService:
         compliance_relevant: bool = False,
         risk_score: float = None,
     ) -> AuditLog:
-        """Log a comprehensive audit event"""
         try:
             et_value = (
                 event_type.value if hasattr(event_type, "value") else str(event_type)
@@ -98,7 +91,6 @@ class AuditService:
         user_id: str = None,
         request_body: Dict[str, Any] = None,
     ) -> AuditLog:
-        """Log API request for monitoring and compliance"""
         try:
             event_type = self._determine_api_event_type(request_url, request_method)
             severity = self._determine_response_severity(response_status)
@@ -144,7 +136,6 @@ class AuditService:
         after_state: Dict[str, Any] = None,
         change_reason: str = None,
     ) -> AuditLog:
-        """Log data changes for audit trail"""
         try:
             event_type = AuditEventType.DATA_ACCESS
             if action in ["create", "insert"]:
@@ -199,7 +190,6 @@ class AuditService:
         severity: AuditSeverity = AuditSeverity.HIGH,
         event_data: Dict[str, Any] = None,
     ) -> AuditLog:
-        """Log security-related events"""
         return self.log_event(
             event_type=AuditEventType.SECURITY_ALERT,
             event_description=f"Security Event: {event_type} - {description}",
@@ -220,7 +210,6 @@ class AuditService:
         resource_id: str = None,
         event_data: Dict[str, Any] = None,
     ) -> AuditLog:
-        """Log compliance-related events"""
         return self.log_event(
             event_type=AuditEventType.COMPLIANCE_CHECK,
             event_description=f"Compliance Event: {compliance_type} - {description}",
@@ -241,7 +230,6 @@ class AuditService:
         end_date: datetime = None,
         limit: int = 100,
     ) -> List[Dict[str, Any]]:
-        """Get audit trail with filtering options"""
         query = AuditLog.query
         if resource_type:
             query = query.filter(AuditLog.resource_type == resource_type)
@@ -262,7 +250,6 @@ class AuditService:
         start_date: datetime = None,
         limit: int = 50,
     ) -> List[Dict[str, Any]]:
-        """Get security alerts"""
         query = AuditLog.query.filter(
             AuditLog.event_type == AuditEventType.SECURITY_ALERT
         )
@@ -279,7 +266,6 @@ class AuditService:
         end_date: datetime,
         compliance_types: List[str] = None,
     ) -> Dict[str, Any]:
-        """Generate compliance report"""
         query = AuditLog.query.filter(
             AuditLog.compliance_relevant,
             AuditLog.event_timestamp >= start_date,
@@ -334,7 +320,6 @@ class AuditService:
         }
 
     def get_user_activity_summary(self, user_id: str, days: int = 30) -> Dict[str, Any]:
-        """Get user activity summary"""
         start_date = datetime.now(timezone.utc) - timedelta(days=days)
         logs = (
             AuditLog.query.filter(
@@ -371,7 +356,6 @@ class AuditService:
         }
 
     def _get_event_category(self, event_type: AuditEventType) -> str:
-        """Get event category for audit event type"""
         category_mapping = {
             AuditEventType.USER_LOGIN: "authentication",
             AuditEventType.USER_LOGOUT: "authentication",
@@ -395,7 +379,6 @@ class AuditService:
     def _calculate_risk_score(
         self, event_type: AuditEventType, event_data: Dict[str, Any] = None
     ) -> float:
-        """Calculate risk score for event"""
         base_risk_scores = {
             AuditEventType.USER_LOGIN: 0.1,
             AuditEventType.USER_LOGOUT: 0.05,
@@ -425,7 +408,6 @@ class AuditService:
         return min(1.0, base_score)
 
     def _determine_api_event_type(self, url: str, method: str) -> AuditEventType:
-        """Determine audit event type based on API endpoint"""
         if "/auth/" in url:
             if "login" in url:
                 return AuditEventType.USER_LOGIN
@@ -448,7 +430,6 @@ class AuditService:
         return AuditEventType.DATA_ACCESS
 
     def _determine_response_severity(self, status_code: int) -> AuditSeverity:
-        """Determine severity based on HTTP response status"""
         if status_code >= 500:
             return AuditSeverity.HIGH
         elif status_code >= 400:
@@ -459,7 +440,6 @@ class AuditService:
     def _calculate_api_risk_score(
         self, method: str, url: str, status_code: int
     ) -> float:
-        """Calculate risk score for API request"""
         base_score = 0.1
         if method in ["POST", "PUT", "DELETE", "PATCH"]:
             base_score += 0.2
@@ -475,7 +455,6 @@ class AuditService:
         return min(1.0, base_score)
 
     def _is_compliance_relevant_endpoint(self, url: str) -> bool:
-        """Check if endpoint is compliance relevant"""
         compliance_endpoints = [
             "/auth/",
             "/profile",
@@ -489,7 +468,6 @@ class AuditService:
         return any((endpoint in url for endpoint in compliance_endpoints))
 
     def _sanitize_sensitive_data(self, data: Dict[str, Any]) -> Dict[str, Any]:
-        """Remove or mask sensitive data from audit logs"""
         if not isinstance(data, dict):
             return data
         sanitized = {}
@@ -515,7 +493,6 @@ class AuditService:
     def _get_changed_fields(
         self, before_state: Dict[str, Any] = None, after_state: Dict[str, Any] = None
     ) -> List[str]:
-        """Get list of fields that changed between states"""
         if not before_state or not after_state:
             return []
         changed_fields = []
@@ -528,7 +505,6 @@ class AuditService:
         return changed_fields
 
     def _check_security_patterns(self, audit_log: AuditLog) -> Any:
-        """Check for suspicious patterns in audit logs"""
         try:
             if (
                 audit_log.event_type == AuditEventType.USER_LOGIN
@@ -543,7 +519,6 @@ class AuditService:
             self.logger.error(f"Failed to check security patterns: {e}")
 
     def _check_failed_login_pattern(self, audit_log: AuditLog) -> Any:
-        """Check for suspicious failed login patterns"""
         if not audit_log.ip_address:
             return
         cutoff_time = datetime.now(timezone.utc) - timedelta(hours=1)
@@ -560,7 +535,6 @@ class AuditService:
             )
 
     def _check_api_access_pattern(self, audit_log: AuditLog) -> Any:
-        """Check for unusual API access patterns"""
         if not audit_log.ip_address:
             return
         cutoff_time = datetime.now(timezone.utc) - timedelta(minutes=5)
@@ -576,7 +550,6 @@ class AuditService:
             )
 
     def _create_security_alert(self, related_log: AuditLog, alert_message: str) -> Any:
-        """Create a security alert based on detected patterns"""
         try:
             alert = AuditLog(
                 id=str(uuid.uuid4()),

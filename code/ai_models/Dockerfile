@@ -4,21 +4,22 @@ WORKDIR /app
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
+    PYTHONPATH=/app/src \
     PORT=5001
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    gcc \
     curl \
+    libgomp1 \
     && rm -rf /var/lib/apt/lists/*
 
-COPY training_scripts/requirements.txt ./requirements.txt
+COPY requirements.txt ./
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt && \
-    pip install --no-cache-dir flask gunicorn numpy
+    pip install --no-cache-dir -r requirements.txt
 
-COPY . .
+COPY src ./src
+COPY wsgi.py ./
 
-RUN python train_model.py
+RUN mkdir -p /app/artifacts && python -m blockscore_ai.training
 
 RUN addgroup --system appgroup && \
     adduser --system --ingroup appgroup appuser && \
@@ -39,4 +40,4 @@ CMD ["gunicorn", \
      "--timeout", "120", \
      "--access-logfile", "-", \
      "--error-logfile", "-", \
-     "server:app"]
+     "wsgi:app"]

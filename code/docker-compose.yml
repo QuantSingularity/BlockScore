@@ -1,7 +1,6 @@
 version: "3.9"
 
 services:
-  # ─── PostgreSQL ───────────────────────────────────────────────────────────
   postgres:
     image: postgres:15-alpine
     container_name: blockscore_postgres
@@ -27,7 +26,6 @@ services:
     networks:
       - blockscore_net
 
-  # ─── Redis ────────────────────────────────────────────────────────────────
   redis:
     image: redis:7-alpine
     container_name: blockscore_redis
@@ -47,7 +45,6 @@ services:
     networks:
       - blockscore_net
 
-  # ─── AI Model Server ──────────────────────────────────────────────────────
   ai_model:
     build:
       context: ./ai_models
@@ -56,9 +53,12 @@ services:
     restart: unless-stopped
     environment:
       PORT: 5001
+      HOST: 0.0.0.0
       FLASK_ENV: ${FLASK_ENV:-production}
-    ports:
-      - "5001:5001"
+      AI_MODEL_API_KEY: ${AI_MODEL_API_KEY:-}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    expose:
+      - "5001"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5001/health"]
       interval: 30s
@@ -68,7 +68,6 @@ services:
     networks:
       - blockscore_net
 
-  # ─── Backend API ──────────────────────────────────────────────────────────
   backend:
     build:
       context: ./backend
@@ -81,11 +80,11 @@ services:
       redis:
         condition: service_healthy
       ai_model:
-        condition: service_healthy
+        condition: service_started
     environment:
       FLASK_ENV: ${FLASK_ENV:-production}
-      SECRET_KEY: ${SECRET_KEY:-change-me-in-production}
-      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-change-me-jwt-in-production}
+      SECRET_KEY: ${SECRET_KEY:?set SECRET_KEY to a random value of 32+ characters}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:?set JWT_SECRET_KEY to a random value of 32+ characters}
       DATABASE_URL: postgresql://${POSTGRES_USER:-blockscore}:${POSTGRES_PASSWORD:-blockscore_password}@postgres:5432/${POSTGRES_DB:-blockscore}
       REDIS_URL: redis://:${REDIS_PASSWORD:-redis_password}@redis:6379/0
       RATELIMIT_STORAGE_URL: redis://:${REDIS_PASSWORD:-redis_password}@redis:6379/1
@@ -103,6 +102,8 @@ services:
       RATE_LIMIT_LOGIN: ${RATE_LIMIT_LOGIN:-5 per minute}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       AI_MODEL_URL: http://ai_model:5001
+      AI_MODEL_API_KEY: ${AI_MODEL_API_KEY:-}
+      AI_MODEL_TIMEOUT: ${AI_MODEL_TIMEOUT:-5}
     volumes:
       - backend_uploads:/app/uploads
       - backend_logs:/app/logs
@@ -117,7 +118,6 @@ services:
     networks:
       - blockscore_net
 
-  # ─── Celery Worker ────────────────────────────────────────────────────────
   celery_worker:
     build:
       context: ./backend
@@ -136,12 +136,15 @@ services:
         condition: service_healthy
     environment:
       FLASK_ENV: ${FLASK_ENV:-production}
-      SECRET_KEY: ${SECRET_KEY:-change-me-in-production}
-      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-change-me-jwt-in-production}
+      SECRET_KEY: ${SECRET_KEY:?set SECRET_KEY to a random value of 32+ characters}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:?set JWT_SECRET_KEY to a random value of 32+ characters}
       DATABASE_URL: postgresql://${POSTGRES_USER:-blockscore}:${POSTGRES_PASSWORD:-blockscore_password}@postgres:5432/${POSTGRES_DB:-blockscore}
       REDIS_URL: redis://:${REDIS_PASSWORD:-redis_password}@redis:6379/0
       CELERY_BROKER_URL: redis://:${REDIS_PASSWORD:-redis_password}@redis:6379/2
       CELERY_RESULT_BACKEND: redis://:${REDIS_PASSWORD:-redis_password}@redis:6379/3
+      AI_MODEL_URL: http://ai_model:5001
+      AI_MODEL_API_KEY: ${AI_MODEL_API_KEY:-}
+      AI_MODEL_TIMEOUT: ${AI_MODEL_TIMEOUT:-5}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
     volumes:
       - backend_uploads:/app/uploads

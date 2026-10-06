@@ -1,8 +1,3 @@
-"""
-Comprehensive Test Suite for Multi-Factor Authentication Service
-Tests for TOTP, SMS, backup codes, and security features
-"""
-
 import json
 import os
 import sys
@@ -18,7 +13,6 @@ sys.path.insert(
 from typing import Any
 from unittest.mock import Mock, patch
 
-import compat_stubs  # noqa
 import pyotp
 import pytest
 
@@ -29,11 +23,9 @@ from services.mfa_service import MFAMethod, MFAService
 
 
 class TestMFAService:
-    """Test suite for MFAService"""
 
     @pytest.fixture
     def db_session(self) -> Any:
-        """Mock database session"""
         session = Mock()
         session.commit = Mock()
         session.rollback = Mock()
@@ -42,7 +34,6 @@ class TestMFAService:
 
     @pytest.fixture
     def mock_user(self) -> Any:
-        """Create a mock user"""
         user = Mock(spec=User)
         user.id = 1
         user.email = "test@example.com"
@@ -54,15 +45,12 @@ class TestMFAService:
 
     @pytest.fixture
     def mfa_service(self, db_session: Any) -> Any:
-        """Create MFAService instance for testing"""
         return MFAService(db_session)
 
     def test_mfa_service_init(self, mfa_service: Any) -> Any:
-        """Test MFAService initializes correctly"""
         assert mfa_service is not None
 
     def test_setup_totp_success(self, mfa_service: Any, mock_user: Any) -> Any:
-        """Test successful TOTP setup"""
         with patch("services.mfa_service.db") as mock_db:
             mock_db.session.get.return_value = mock_user
             result = mfa_service.setup_totp(mock_user.id)
@@ -71,7 +59,6 @@ class TestMFAService:
         assert "qr_code" in result
 
     def test_setup_totp_user_not_found(self, mfa_service: Any) -> Any:
-        """Test TOTP setup with nonexistent user"""
         with patch("services.mfa_service.db") as mock_db:
             mock_db.session.get.return_value = None
             result = mfa_service.setup_totp(999)
@@ -79,7 +66,6 @@ class TestMFAService:
         assert "not found" in result["message"].lower()
 
     def test_verify_totp_valid_code(self, mfa_service: Any, mock_user: Any) -> Any:
-        """Test TOTP verification with valid code"""
         secret = pyotp.random_base32()
         mock_user.mfa_secret = secret
         mock_user.totp_secret = secret
@@ -92,7 +78,6 @@ class TestMFAService:
         assert result["valid"] is True
 
     def test_verify_totp_invalid_code(self, mfa_service: Any, mock_user: Any) -> Any:
-        """Test TOTP verification with invalid code"""
         secret = pyotp.random_base32()
         mock_user.mfa_secret = secret
         mock_user.totp_secret = secret
@@ -103,14 +88,12 @@ class TestMFAService:
         assert result["valid"] is False
 
     def test_verify_totp_user_not_found(self, mfa_service: Any) -> Any:
-        """Test TOTP verification when user doesn't exist"""
         with patch("services.mfa_service.db") as mock_db:
             mock_db.session.get.return_value = None
             result = mfa_service.verify_totp(999, "123456")
         assert result["valid"] is False
 
     def test_enable_mfa_success(self, mfa_service: Any, mock_user: Any) -> Any:
-        """Test enabling MFA after setup"""
         secret = pyotp.random_base32()
         mock_user.mfa_secret = secret
         totp = pyotp.TOTP(secret)
@@ -122,7 +105,6 @@ class TestMFAService:
         assert mock_user.mfa_enabled is True
 
     def test_enable_mfa_invalid_code(self, mfa_service: Any, mock_user: Any) -> Any:
-        """Test enabling MFA with invalid code"""
         secret = pyotp.random_base32()
         mock_user.mfa_secret = secret
         with patch("services.mfa_service.db") as mock_db:
@@ -131,7 +113,6 @@ class TestMFAService:
         assert result["success"] is False
 
     def test_disable_mfa_success(self, mfa_service: Any, mock_user: Any) -> Any:
-        """Test disabling MFA"""
         secret = pyotp.random_base32()
         mock_user.mfa_secret = secret
         mock_user.mfa_enabled = True
@@ -144,7 +125,6 @@ class TestMFAService:
         assert mock_user.mfa_enabled is False
 
     def test_disable_mfa_invalid_code(self, mfa_service: Any, mock_user: Any) -> Any:
-        """Test disabling MFA with invalid code"""
         secret = pyotp.random_base32()
         mock_user.mfa_secret = secret
         mock_user.mfa_enabled = True
@@ -154,14 +134,12 @@ class TestMFAService:
         assert result["success"] is False
 
     def test_generate_backup_codes(self, mfa_service: Any) -> Any:
-        """Test backup code generation"""
         codes = mfa_service._generate_backup_codes(10)
         assert len(codes) == 10
         assert all(len(c) > 0 for c in codes)
         assert len(set(codes)) == 10
 
     def test_verify_backup_code_success(self, mfa_service: Any, mock_user: Any) -> Any:
-        """Test verifying a valid backup code"""
         backup_codes = ["ABCD1234", "EFGH5678"]
         mock_user.backup_codes = json.dumps(backup_codes)
         with patch("services.mfa_service.db") as mock_db:
@@ -170,7 +148,6 @@ class TestMFAService:
         assert result["valid"] is True
 
     def test_verify_backup_code_invalid(self, mfa_service: Any, mock_user: Any) -> Any:
-        """Test verifying an invalid backup code"""
         backup_codes = ["ABCD1234", "EFGH5678"]
         mock_user.backup_codes = json.dumps(backup_codes)
         with patch("services.mfa_service.db") as mock_db:
@@ -179,7 +156,6 @@ class TestMFAService:
         assert result["valid"] is False
 
     def test_verify_backup_code_consumed(self, mfa_service: Any, mock_user: Any) -> Any:
-        """Test that used backup codes are removed"""
         backup_codes = ["ABCD1234", "EFGH5678"]
         mock_user.backup_codes = json.dumps(backup_codes)
         with patch("services.mfa_service.db") as mock_db:
@@ -190,12 +166,10 @@ class TestMFAService:
         assert "EFGH5678" in remaining
 
     def test_mfa_method_constants(self) -> Any:
-        """Test MFAMethod constants"""
         assert MFAMethod.TOTP == "totp"
         assert MFAMethod.SMS == "sms"
 
     def test_get_mfa_status_enabled(self, mfa_service: Any, mock_user: Any) -> Any:
-        """Test MFA status when enabled"""
         mock_user.mfa_enabled = True
         mock_user.mfa_secret = "test_secret"
         with patch("services.mfa_service.db") as mock_db:
@@ -204,7 +178,6 @@ class TestMFAService:
         assert status["mfa_enabled"] is True
 
     def test_get_mfa_status_disabled(self, mfa_service: Any, mock_user: Any) -> Any:
-        """Test MFA status when disabled"""
         mock_user.mfa_enabled = False
         mock_user.mfa_secret = None
         with patch("services.mfa_service.db") as mock_db:
@@ -213,7 +186,6 @@ class TestMFAService:
         assert status["mfa_enabled"] is False
 
     def test_totp_is_time_based(self) -> Any:
-        """Test that TOTP codes change over time"""
         secret = pyotp.random_base32()
         totp = pyotp.TOTP(secret)
         code = totp.now()
@@ -221,7 +193,6 @@ class TestMFAService:
         assert code.isdigit()
 
     def test_setup_totp_generates_qr(self, mfa_service: Any, mock_user: Any) -> Any:
-        """Test that TOTP setup generates a QR code"""
         with patch("services.mfa_service.db") as mock_db:
             mock_db.session.get.return_value = mock_user
             result = mfa_service.setup_totp(mock_user.id)

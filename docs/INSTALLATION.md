@@ -97,7 +97,7 @@ nano .env
 #### Step 3: AI Models Setup
 
 ```bash
-cd ../ai_models/training_scripts
+cd ../ai_models
 
 # Create virtual environment
 python3 -m venv venv_ai

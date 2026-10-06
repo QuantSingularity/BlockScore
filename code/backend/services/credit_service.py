@@ -1,31 +1,8 @@
-"""
-Credit Scoring Service for BlockScore Backend
-Advanced AI-powered credit scoring with blockchain integration
-"""
-
 import logging
 import os
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
-
-import requests
-
-try:
-    import joblib
-
-    _JOBLIB_AVAILABLE = True
-except ImportError:
-    joblib = None
-    _JOBLIB_AVAILABLE = False
-
-try:
-    import pandas as pd
-
-    _PANDAS_AVAILABLE = True
-except ImportError:
-    pd = None
-    _PANDAS_AVAILABLE = False
 
 from extensions import db
 from models.blockchain import BlockchainTransaction
@@ -38,28 +15,38 @@ from models.credit import (
     CreditScoreStatus,
 )
 from models.user import User
+from services.ai_client import AIModelClient
+
+RULES_MODEL_NAME = "blockscore-rules"
+RULES_MODEL_VERSION = "1.0"
+LEGACY_MODEL_PREFIX = "BlockScore_v"
+MAX_INLINE_BULK_USERS = 100
 
 
 class CreditScoringService:
-    """Advanced credit scoring service with AI models and blockchain integration"""
 
-    def __init__(self, db: Any, cache_manager: Any = None) -> None:
+    def __init__(
+        self,
+        db: Any,
+        cache_manager: Any = None,
+        ai_client: Optional[AIModelClient] = None,
+    ) -> None:
         self.db = db
         self.cache = cache_manager
         self.monitor = None
         self.job_manager = None
         self.blockchain_service = None
         self.logger = logging.getLogger(__name__)
-        self.model = None
-        self.model_version = "1.0"
-        self.model_name = "BlockScore_v1.0"
+        self.model_version = RULES_MODEL_VERSION
+        self.model_name = RULES_MODEL_NAME
         self.min_score = 300
         self.max_score = 850
         self.default_score = 300
-        self.ai_model_url = os.getenv("AI_MODEL_URL", "http://localhost:5001").rstrip(
-            "/"
+        self.ai_client = ai_client or AIModelClient(
+            base_url=os.getenv("AI_MODEL_URL", "http://localhost:5001"),
+            timeout=float(os.getenv("AI_MODEL_TIMEOUT", "5")),
+            api_key=os.getenv("AI_MODEL_API_KEY", ""),
         )
-        self.ai_model_timeout = float(os.getenv("AI_MODEL_TIMEOUT", "5"))
         self.factor_weights = {
             CreditFactorType.PAYMENT_HISTORY: 0.35,
             CreditFactorType.CREDIT_UTILIZATION: 0.3,
@@ -70,7 +57,6 @@ class CreditScoringService:
             CreditFactorType.DEBT_TO_INCOME: 0.05,
             CreditFactorType.BLOCKCHAIN_ACTIVITY: 0.1,
         }
-        self._load_model()
 
     def calculate_credit_score(
         self,
@@ -78,7 +64,6 @@ class CreditScoringService:
         wallet_address: Optional[str] = None,
         force_recalculation: bool = False,
     ) -> Dict[str, Any]:
-        """Calculate comprehensive credit score for user"""
         import time
 
         start_time = time.time()
@@ -96,25 +81,23 @@ class CreditScoringService:
                         )
                     return result
             scoring_data = self._gather_scoring_data(user, wallet_address)
-
-            # Try AI model first (patchable by tests)
+            factors = self._calculate_factor_scores(scoring_data)
             ai_result = self._call_ai_model(scoring_data)
-            if (
-                ai_result
-                and ai_result.get("score")
-                and ai_result["score"] != self.default_score
-            ):
-                overall_score = ai_result["score"]
-                confidence = ai_result.get("confidence", 0.85)
-                factors = self._calculate_factor_scores(scoring_data)
+            if ai_result and self._validate_score(ai_result.get("score")):
+                overall_score = int(ai_result["score"])
+                confidence = float(ai_result.get("confidence", 0.85))
+                scoring_source = "ai_model"
+                scoring_model_name = ai_result.get("model_name") or self.model_name
+                scoring_model_version = ai_result.get("model_version") or "unknown"
+                insights = self._normalize_insights(ai_result.get("factors"))
             else:
-                factors = self._calculate_factor_scores(scoring_data)
                 overall_score = self._calculate_overall_score(factors)
-                confidence = 0.85
+                confidence = self._rule_based_confidence(factors)
+                scoring_source = "rule_based"
+                scoring_model_name = RULES_MODEL_NAME
+                scoring_model_version = RULES_MODEL_VERSION
+                insights = []
 
-            # Capture the previous score now, before we create and commit
-            # the new one below - otherwise a later lookup would just
-            # find the record we're about to create (always a zero delta).
             previous_score_record = self._get_recent_valid_score(user_id)
             previous_score_value = (
                 previous_score_record.score if previous_score_record else None
@@ -125,8 +108,17 @@ class CreditScoringService:
                 score=overall_score,
                 factors=factors,
                 scoring_data=scoring_data,
+                model_name=scoring_model_name,
+                model_version=scoring_model_version,
+                confidence=confidence,
             )
-            credit_score.model_confidence = confidence
+            credit_score.calculation_method = scoring_source
+            credit_score.set_factors_positive(
+                [i for i in insights if i["impact"] == "positive"]
+            )
+            credit_score.set_factors_negative(
+                [i for i in insights if i["impact"] == "negative"]
+            )
             self.db.session.commit()
 
             self._create_credit_history_event(
@@ -137,10 +129,15 @@ class CreditScoringService:
             )
             result = self._format_score_response(credit_score)
             result["factors"] = [f.to_dict() for f in factors]
-            result["version"] = self.model_version
+            result["version"] = credit_score.score_version
             result["ai_confidence"] = confidence
-
-            # Blockchain integration
+            result["scoring"] = {
+                "source": scoring_source,
+                "model_name": credit_score.model_name,
+                "model_version": credit_score.score_version,
+                "confidence": confidence,
+                "insights": insights,
+            }
             if wallet_address and self.blockchain_service:
                 try:
                     bc_result = self.blockchain_service.submit_credit_score_update(
@@ -176,7 +173,6 @@ class CreditScoringService:
             return {"error": str(e), "user_id": user_id}
 
     def get_credit_history(self, user_id: str, limit: int = 50) -> List[Dict[str, Any]]:
-        """Get credit history for user"""
         history = (
             CreditHistory.query.filter_by(user_id=user_id)
             .order_by(CreditHistory.event_date.desc())
@@ -185,38 +181,9 @@ class CreditScoringService:
         )
         return [event.to_dict() for event in history]
 
-    def get_credit_factors(self, credit_score_id: str) -> List[Dict[str, Any]]:
-        """Get detailed credit factors for a score"""
-        factors = CreditFactor.query.filter_by(credit_score_id=credit_score_id).all()
-        return [factor.to_dict() for factor in factors]
-
-    def simulate_score_impact(
-        self, user_id: str, scenario: Dict[str, Any]
-    ) -> Dict[str, Any]:
-        """Simulate impact of changes on credit score"""
-        try:
-            current_score = self._get_recent_valid_score(user_id)
-            if not current_score:
-                raise ValueError("No current credit score found")
-            modified_data = self._apply_scenario_changes(user_id, scenario)
-            factors = self._calculate_factor_scores(modified_data)
-            new_score = self._calculate_overall_score(factors)
-            score_change = new_score - current_score.score
-            return {
-                "current_score": current_score.score,
-                "projected_score": new_score,
-                "score_change": score_change,
-                "impact_analysis": self._analyze_score_impact(factors, scenario),
-                "recommendations": self._generate_recommendations(factors),
-            }
-        except Exception as e:
-            self.logger.error(f"Score simulation failed for user {user_id}: {e}")
-            raise e
-
     def update_credit_event(
         self, user_id: str, event_type: CreditEventType, event_data: Dict[str, Any]
     ) -> bool:
-        """Update credit profile with new event"""
         try:
             event = CreditHistory(
                 id=str(uuid.uuid4()),
@@ -245,7 +212,6 @@ class CreditScoringService:
             return False
 
     def get_score_explanation(self, credit_score_id: str) -> Dict[str, Any]:
-        """Get detailed explanation of credit score calculation"""
         credit_score = db.session.get(CreditScore, credit_score_id)
         if not credit_score:
             raise ValueError("Credit score not found")
@@ -273,43 +239,10 @@ class CreditScoringService:
             "recommendations": self._generate_recommendations(factors),
         }
 
-    def is_model_loaded(self) -> bool:
-        """Check if the local fallback AI model is loaded"""
-        return self.model is not None
-
     def is_ai_service_available(self) -> bool:
-        """Check whether the ai_models HTTP scoring service is reachable"""
-        try:
-            response = requests.get(f"{self.ai_model_url}/health", timeout=2)
-            return response.status_code == 200
-        except requests.exceptions.RequestException:
-            return False
-
-    def _load_model(self) -> Any:
-        """Load a local copy of the AI model as a same-process fallback"""
-        if not _JOBLIB_AVAILABLE:
-            self.logger.info("joblib not installed; local AI model fallback disabled.")
-            self.model = None
-            return
-        try:
-            model_path = os.path.join(
-                os.path.dirname(
-                    os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-                ),
-                "ai_models",
-                "credit_scoring_model.pkl",
-            )
-            self.model = joblib.load(model_path)
-            self.logger.info(f"Loaded local fallback AI model from {model_path}")
-        except Exception as e:
-            self.logger.info(
-                f"No local fallback AI model available ({e}); relying on the "
-                "ai_models HTTP service and rule-based scoring."
-            )
-            self.model = None
+        return self.ai_client.is_available()
 
     def _get_recent_valid_score(self, user_id: str) -> Optional[CreditScore]:
-        """Get recent valid credit score for user"""
         cutoff_date = datetime.now(timezone.utc) - timedelta(days=30)
         return (
             CreditScore.query.filter_by(user_id=user_id)
@@ -322,7 +255,6 @@ class CreditScoringService:
     def _gather_scoring_data(
         self, user: User, wallet_address: Optional[str] = None
     ) -> Dict[str, Any]:
-        """Gather all data needed for credit scoring"""
         data = {
             "user_id": user.id,
             "wallet_address": wallet_address
@@ -360,8 +292,9 @@ class CreditScoringService:
             {
                 "event_type": event.event_type.value,
                 "amount": float(event.amount) if event.amount else 0,
-                "event_date": event.event_date,
+                "event_date": self._as_utc(event.event_date),
                 "score_change": event.score_change or 0,
+                "loan_id": event.loan_id,
             }
             for event in credit_events
         ]
@@ -369,8 +302,34 @@ class CreditScoringService:
             data["blockchain_data"] = self._get_blockchain_data(data["wallet_address"])
         return data
 
+    @staticmethod
+    def _as_utc(value: Any) -> Any:
+        if isinstance(value, datetime) and value.tzinfo is None:
+            return value.replace(tzinfo=timezone.utc)
+        return value
+
+    @staticmethod
+    def _outstanding_debt(credit_history: List[Dict[str, Any]]) -> float:
+        opened: Dict[str, float] = {}
+        closed = set()
+        anonymous = 0.0
+        for event in credit_history:
+            event_type = event["event_type"]
+            amount = float(event.get("amount") or 0)
+            loan_id = event.get("loan_id")
+            if event_type in ("loan_approval", "loan_disbursement"):
+                if loan_id:
+                    opened[loan_id] = max(opened.get(loan_id, 0.0), amount)
+                else:
+                    anonymous += amount
+            elif event_type == "loan_closed":
+                if loan_id:
+                    closed.add(loan_id)
+                else:
+                    anonymous = max(0.0, anonymous - amount)
+        return sum(a for key, a in opened.items() if key not in closed) + anonymous
+
     def _get_blockchain_data(self, wallet_address: str) -> Dict[str, Any]:
-        """Get blockchain transaction data for wallet"""
         transactions = (
             BlockchainTransaction.query.filter(
                 (BlockchainTransaction.from_address == wallet_address)
@@ -413,7 +372,6 @@ class CreditScoringService:
         }
 
     def _calculate_factor_scores(self, data: Dict[str, Any]) -> List[CreditFactor]:
-        """Calculate individual credit factor scores"""
         factors = []
         payment_factor = self._calculate_payment_history_factor(data)
         factors.append(payment_factor)
@@ -434,13 +392,18 @@ class CreditScoringService:
         return factors
 
     def _calculate_payment_history_factor(self, data: Dict[str, Any]) -> CreditFactor:
-        """Calculate payment history factor score"""
         credit_history = data.get("credit_history", [])
         blockchain_data = data.get("blockchain_data", {})
         if credit_history:
-            payment_events = [e for e in credit_history if "payment" in e["event_type"]]
+            payment_events = [
+                e
+                for e in credit_history
+                if e["event_type"] in ("payment_made", "payment_missed", "payment_late")
+            ]
             if payment_events:
-                positive_events = [e for e in payment_events if e["score_change"] >= 0]
+                positive_events = [
+                    e for e in payment_events if e["event_type"] == "payment_made"
+                ]
                 payment_ratio = len(positive_events) / len(payment_events)
             else:
                 payment_ratio = 0.5
@@ -466,17 +429,10 @@ class CreditScoringService:
     def _calculate_credit_utilization_factor(
         self, data: Dict[str, Any]
     ) -> CreditFactor:
-        """Calculate credit utilization factor score"""
         credit_history = data.get("credit_history", [])
         profile_data = data.get("profile_data", {})
         annual_income = profile_data.get("annual_income") or 50000
-        outstanding_debt = sum(
-            (
-                e["amount"]
-                for e in credit_history
-                if e["event_type"] in ["loan_approval", "loan_disbursement"]
-            )
-        )
+        outstanding_debt = self._outstanding_debt(credit_history)
         total_credit_limit = annual_income * 2
         if total_credit_limit > 0:
             utilization_ratio = min(1.0, outstanding_debt / total_credit_limit)
@@ -500,7 +456,6 @@ class CreditScoringService:
         )
 
     def _calculate_length_of_history_factor(self, data: Dict[str, Any]) -> CreditFactor:
-        """Calculate length of credit history factor"""
         profile_data = data.get("profile_data", {})
         account_age_days = profile_data.get("account_age_days", 0)
         max_age_for_full_score = 365 * 7
@@ -523,7 +478,6 @@ class CreditScoringService:
         )
 
     def _calculate_credit_mix_factor(self, data: Dict[str, Any]) -> CreditFactor:
-        """Calculate credit mix factor score"""
         credit_history = data.get("credit_history", [])
         event_types = set((e["event_type"] for e in credit_history))
         mix_score = min(100, len(event_types) * 20)
@@ -544,7 +498,6 @@ class CreditScoringService:
         )
 
     def _calculate_new_credit_factor(self, data: Dict[str, Any]) -> CreditFactor:
-        """Calculate new credit factor score"""
         credit_history = data.get("credit_history", [])
         cutoff_date = datetime.now(timezone.utc) - timedelta(days=180)
         recent_applications = [
@@ -571,7 +524,6 @@ class CreditScoringService:
         )
 
     def _calculate_income_stability_factor(self, data: Dict[str, Any]) -> CreditFactor:
-        """Calculate income stability factor score"""
         profile_data = data.get("profile_data", {})
         employment_status = profile_data.get("employment_status", "unknown")
         employment_scores = {
@@ -600,18 +552,11 @@ class CreditScoringService:
         )
 
     def _calculate_debt_to_income_factor(self, data: Dict[str, Any]) -> CreditFactor:
-        """Calculate debt-to-income factor score"""
         profile_data = data.get("profile_data", {})
         credit_history = data.get("credit_history", [])
         annual_income = profile_data.get("annual_income") or 50000
         monthly_income = annual_income / 12
-        outstanding_debt = sum(
-            (
-                e["amount"]
-                for e in credit_history
-                if e["event_type"] in ["loan_approval", "loan_disbursement"]
-            )
-        )
+        outstanding_debt = self._outstanding_debt(credit_history)
         estimated_monthly_debt = outstanding_debt / 12
         if monthly_income > 0:
             estimated_dti = min(1.0, estimated_monthly_debt / monthly_income)
@@ -637,7 +582,6 @@ class CreditScoringService:
     def _calculate_blockchain_activity_factor(
         self, data: Dict[str, Any]
     ) -> CreditFactor:
-        """Calculate blockchain activity factor score"""
         blockchain_data = data.get("blockchain_data", {})
         if not blockchain_data:
             raw_score = 50
@@ -668,32 +612,36 @@ class CreditScoringService:
         )
 
     def _calculate_overall_score(self, factors: List[CreditFactor]) -> int:
-        """Calculate overall credit score from factors"""
-        if self.model:
-            return self._calculate_score_with_model(factors)
-        else:
-            total_contribution = sum((factor.contribution for factor in factors))
-            score = self.min_score + total_contribution / 100 * (
-                self.max_score - self.min_score
-            )
-            return max(self.min_score, min(self.max_score, int(score)))
+        total_contribution = sum(factor.contribution or 0 for factor in factors)
+        score = self.min_score + total_contribution / 100 * (
+            self.max_score - self.min_score
+        )
+        return max(self.min_score, min(self.max_score, int(score)))
 
-    def _calculate_score_with_model(self, factors: List[CreditFactor]) -> int:
-        """Calculate score using AI model"""
-        try:
-            feature_dict = {
-                factor.factor_type.value: factor.normalized_value for factor in factors
-            }
-            if not _PANDAS_AVAILABLE or pd is None:
-                raise ImportError("pandas not available")
-            features_df = pd.DataFrame([feature_dict])
-            predicted_score = self.model.predict(features_df)[0]
-            return max(self.min_score, min(self.max_score, int(predicted_score)))
-        except Exception as e:
-            self.logger.error(f"Model prediction failed: {e}")
-            total = sum(f.contribution or 0 for f in factors)
-            score = self.min_score + (total / 100) * (self.max_score - self.min_score)
-            return max(self.min_score, min(self.max_score, int(score)))
+    @staticmethod
+    def _rule_based_confidence(factors: List[CreditFactor]) -> float:
+        total_weight = sum(f.weight or 0 for f in factors)
+        if total_weight <= 0:
+            return 0.5
+        weighted = sum((f.confidence_level or 0) * (f.weight or 0) for f in factors)
+        return round(weighted / total_weight, 2)
+
+    @staticmethod
+    def _normalize_insights(raw: Any) -> List[Dict[str, Any]]:
+        if not isinstance(raw, list):
+            return []
+        insights = []
+        for item in raw:
+            if not isinstance(item, dict):
+                continue
+            insights.append(
+                {
+                    "factor": str(item.get("factor", "")),
+                    "impact": str(item.get("impact", "neutral")),
+                    "description": str(item.get("description", "")),
+                }
+            )
+        return insights
 
     def _create_credit_score_record(
         self,
@@ -701,17 +649,19 @@ class CreditScoringService:
         score: int,
         factors: List[CreditFactor],
         scoring_data: Dict[str, Any],
+        model_name: Optional[str] = None,
+        model_version: Optional[str] = None,
+        confidence: float = 0.5,
     ) -> CreditScore:
-        """Create credit score database record"""
         try:
             credit_score = CreditScore(
                 id=str(uuid.uuid4()),
                 user_id=user_id,
                 score=score,
-                score_version=self.model_version,
+                score_version=str(model_version or self.model_version)[:10],
                 status=CreditScoreStatus.ACTIVE,
-                model_name=self.model_name,
-                model_confidence=0.85,
+                model_name=str(model_name or self.model_name)[:100],
+                model_confidence=confidence,
                 calculated_at=datetime.now(timezone.utc),
                 expires_at=datetime.now(timezone.utc) + timedelta(days=30),
                 valid_until=datetime.now(timezone.utc) + timedelta(days=90),
@@ -751,7 +701,6 @@ class CreditScoringService:
         event_type: CreditEventType,
         score_after: int,
     ) -> Any:
-        """Create credit history event"""
         try:
             event = CreditHistory(
                 id=str(uuid.uuid4()),
@@ -770,7 +719,6 @@ class CreditScoringService:
             self.logger.error(f"Failed to create credit history event: {e}")
 
     def _format_score_response(self, credit_score: CreditScore) -> Dict[str, Any]:
-        """Format credit score response"""
         return {
             "credit_score_id": credit_score.id,
             "score": credit_score.score,
@@ -783,10 +731,24 @@ class CreditScoringService:
             "is_valid": credit_score.is_valid(),
             "score_breakdown": credit_score.get_score_breakdown(),
             "confidence": credit_score.model_confidence,
+            "model_name": credit_score.model_name,
+            "scoring_source": self._scoring_source(credit_score),
+            "insights": {
+                "positive": credit_score.get_factors_positive(),
+                "negative": credit_score.get_factors_negative(),
+            },
         }
 
+    @staticmethod
+    def _scoring_source(credit_score: CreditScore) -> str:
+        if credit_score.calculation_method in ("ai_model", "rule_based"):
+            return credit_score.calculation_method
+        model_name = credit_score.model_name
+        if not model_name or model_name.startswith(LEGACY_MODEL_PREFIX):
+            return "unknown"
+        return "rule_based" if model_name == RULES_MODEL_NAME else "ai_model"
+
     def _get_score_grade(self, score: int) -> str:
-        """Get letter grade for credit score"""
         if score >= 800:
             return "Excellent"
         elif score >= 740:
@@ -799,7 +761,6 @@ class CreditScoringService:
             return "Poor"
 
     def _get_factor_impact(self, contribution: float) -> str:
-        """Get impact description for factor contribution"""
         if contribution >= 80:
             return "Very Positive"
         elif contribution >= 60:
@@ -811,58 +772,7 @@ class CreditScoringService:
         else:
             return "Very Negative"
 
-    def _apply_scenario_changes(
-        self, user_id: str, scenario: Dict[str, Any]
-    ) -> Dict[str, Any]:
-        """Apply scenario changes to scoring data"""
-        user = db.session.get(User, user_id)
-        if not user:
-            raise ValueError("User not found")
-        modified_data = self._gather_scoring_data(user)
-        if "profile_data" in scenario:
-            modified_data["profile_data"].update(scenario["profile_data"])
-        if "new_loan" in scenario:
-            loan_data = scenario["new_loan"]
-            modified_data["credit_history"].append(
-                {
-                    "event_type": "loan_approval",
-                    "amount": loan_data.get("amount", 0),
-                    "event_date": datetime.now(timezone.utc),
-                    "score_change": 0,
-                }
-            )
-            modified_data["credit_history"].append(
-                {
-                    "event_type": "credit_inquiry",
-                    "amount": 0,
-                    "event_date": datetime.now(timezone.utc),
-                    "score_change": 0,
-                }
-            )
-        if "payment_made" in scenario:
-            payment_data = scenario["payment_made"]
-            modified_data["credit_history"].append(
-                {
-                    "event_type": "payment_made",
-                    "amount": payment_data.get("amount", 0),
-                    "event_date": datetime.now(timezone.utc),
-                    "score_change": 10,
-                }
-            )
-        return modified_data
-
-    def _analyze_score_impact(
-        self, factors: List[CreditFactor], scenario: Dict[str, Any]
-    ) -> Dict[str, Any]:
-        """Analyze the impact of scenario changes"""
-        return {
-            "primary_factors": [f.factor_name for f in factors[:3]],
-            "improvement_potential": "Medium",
-            "timeline": "3-6 months",
-        }
-
     def _generate_recommendations(self, factors: List[CreditFactor]) -> List[str]:
-        """Generate recommendations for improving credit score"""
         recommendations = []
         for factor in factors:
             if factor.normalized_value < 0.6:
@@ -881,7 +791,6 @@ class CreditScoringService:
         return recommendations[:5]
 
     def _is_significant_event(self, event_type: CreditEventType) -> bool:
-        """Check if event type should trigger score recalculation"""
         significant_events = {
             CreditEventType.LOAN_APPROVAL,
             CreditEventType.LOAN_DISBURSEMENT,
@@ -892,13 +801,7 @@ class CreditScoringService:
         }
         return event_type in significant_events
 
-    # -----------------------------------------------------------------------
-    # Additional public API methods required by tests
-    # -----------------------------------------------------------------------
-
     def get_credit_score(self, user_id: str) -> Optional[Dict[str, Any]]:
-        """Get current credit score for user, returning dict or None"""
-        # Check cache first if available
         if self.cache:
             cached = self.cache.get(f"credit_score:{user_id}")
             if cached:
@@ -909,7 +812,6 @@ class CreditScoringService:
             return None
         result = self._format_score_response(score)
         result["calculated_at"] = score.calculated_at.isoformat()
-        # Return raw DB value so callers can compare directly with model attribute
         result["factors_positive"] = score.factors_positive
         result["factors_negative"] = score.factors_negative
         return result
@@ -917,7 +819,6 @@ class CreditScoringService:
     def get_credit_score_history(
         self, user_id: str, limit: int = 10
     ) -> List[Dict[str, Any]]:
-        """Get credit score history sorted newest-first"""
         scores = (
             CreditScore.query.filter_by(user_id=user_id)
             .order_by(CreditScore.calculated_at.desc())
@@ -932,7 +833,6 @@ class CreditScoringService:
         event_type: Any,
         event_data: Dict[str, Any],
     ) -> Dict[str, Any]:
-        """Add a credit event and return success dict"""
         try:
             if isinstance(event_type, str):
                 try:
@@ -949,7 +849,6 @@ class CreditScoringService:
 
                 amount = Decimal(str(amount))
 
-            # Auto-assign impact_score based on event type if not provided
             impact_score = event_data.get("impact_score")
             if impact_score is None:
                 _negative_events = {
@@ -995,8 +894,6 @@ class CreditScoringService:
             return {"success": False, "message": str(e)}
 
     def get_credit_factors(self, user_id_or_score_id: str) -> Dict[str, Any]:
-        """Get credit factors, accepting user_id or credit_score_id"""
-        # Check if it's a user_id first
         events = (
             CreditHistory.query.filter_by(user_id=user_id_or_score_id)
             .order_by(CreditHistory.event_date.desc())
@@ -1047,7 +944,6 @@ class CreditScoringService:
                 "negative_factors": negative_factors,
             }
 
-        # Fall back to treating as credit_score_id
         factors = CreditFactor.query.filter_by(
             credit_score_id=user_id_or_score_id
         ).all()
@@ -1061,7 +957,6 @@ class CreditScoringService:
         }
 
     def analyze_credit_trends(self, user_id: str) -> Dict[str, Any]:
-        """Analyze credit score trends for a user"""
         scores = (
             CreditScore.query.filter_by(user_id=user_id)
             .order_by(CreditScore.calculated_at.asc())
@@ -1095,7 +990,6 @@ class CreditScoringService:
         }
 
     def get_credit_recommendations(self, user_id: str) -> List[Dict[str, Any]]:
-        """Get credit improvement recommendations for user"""
         events = (
             CreditHistory.query.filter_by(user_id=user_id)
             .order_by(CreditHistory.event_date.desc())
@@ -1130,7 +1024,6 @@ class CreditScoringService:
         event_type: Any,
         event_data: Dict[str, Any],
     ) -> Dict[str, Any]:
-        """Simulate impact of a credit event on the score"""
         current = self._get_recent_valid_score(user_id)
         current_score = current.score if current else self.default_score
 
@@ -1140,7 +1033,6 @@ class CreditScoringService:
             except ValueError:
                 pass
 
-        # Estimate impact
         positive_events = {
             CreditEventType.PAYMENT_MADE,
             CreditEventType.LOAN_CLOSED,
@@ -1167,76 +1059,81 @@ class CreditScoringService:
         }
 
     def bulk_calculate_scores(self, user_ids: List[str]) -> Dict[str, Any]:
-        """Submit bulk score calculation job"""
+        unique_ids = list(dict.fromkeys(user_ids))
+        if self.job_manager is not None:
+            try:
+                job_id = self.job_manager.submit_job(
+                    "blockscore_jobs.credit_scoring.batch_calculate",
+                    args=[unique_ids],
+                )
+                return {
+                    "job_id": job_id,
+                    "user_count": len(unique_ids),
+                    "status": "submitted",
+                }
+            except Exception as exc:
+                self.logger.warning(f"Background job submission failed: {exc}")
+        if len(unique_ids) > MAX_INLINE_BULK_USERS:
+            return {
+                "job_id": None,
+                "user_count": len(unique_ids),
+                "status": "rejected",
+                "error": "Background job manager unavailable for large batches",
+            }
+        results = {}
+        for user_id in unique_ids:
+            outcome = self.calculate_credit_score(user_id, force_recalculation=True)
+            results[user_id] = outcome.get("score") if "error" not in outcome else None
         return {
             "job_id": str(uuid.uuid4()),
-            "user_count": len(user_ids),
-            "status": "submitted",
+            "user_count": len(unique_ids),
+            "status": "completed",
+            "results": results,
         }
 
     def _validate_score(self, score: int) -> bool:
-        """Validate that a score is within valid range"""
         try:
             return self.min_score <= int(score) <= self.max_score
         except (TypeError, ValueError):
             return False
 
-    def _call_ai_model(self, features: Dict[str, Any]) -> Dict[str, Any]:
-        """Score a user via the ai_models service, with local/rule-based fallbacks"""
+    def _call_ai_model(self, features: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         history_records = self._build_ai_history_records(features)
-
-        ai_response = self._request_ai_prediction(history_records)
-        if ai_response is not None:
-            return ai_response
-
-        if self.model is not None and _PANDAS_AVAILABLE and history_records:
-            try:
-                local_features = self._extract_local_model_features(history_records)
-                df = pd.DataFrame([local_features])
-                score = int(self.model.predict(df)[0])
-                score = max(self.min_score, min(self.max_score, score))
-                return {"score": score, "confidence": 0.75, "factors": {}}
-            except Exception as e:
-                self.logger.error(f"Local AI model fallback failed: {e}")
-
-        return {"score": self.default_score, "confidence": 0.5, "factors": {}}
-
-    def _request_ai_prediction(
-        self, history_records: List[Dict[str, Any]]
-    ) -> Optional[Dict[str, Any]]:
-        """POST credit history to the ai_models /predict endpoint"""
         if not history_records:
             return None
+        payload = self.ai_client.predict(history_records)
+        return self._parse_ai_payload(payload)
+
+    def _parse_ai_payload(
+        self, payload: Optional[Dict[str, Any]]
+    ) -> Optional[Dict[str, Any]]:
+        if not payload:
+            return None
         try:
-            response = requests.post(
-                f"{self.ai_model_url}/predict",
-                json={"creditHistory": history_records},
-                timeout=self.ai_model_timeout,
-            )
-            response.raise_for_status()
-            payload = response.json()
-            score = payload.get("score")
-            if score is None:
-                self.logger.warning(
-                    f"AI model service response missing 'score': {payload}"
-                )
+            if int(payload.get("recordCount", 1)) <= 0:
                 return None
-            return {
-                "score": max(self.min_score, min(self.max_score, int(score))),
-                "confidence": float(payload.get("confidence", 0.85)),
-                "factors": payload.get("factors", {}),
-            }
-        except requests.exceptions.RequestException as e:
-            self.logger.warning(
-                f"AI model service at {self.ai_model_url} unreachable: {e}"
+            score = int(payload["score"])
+            confidence = float(payload.get("confidence", 0.85))
+        except (KeyError, TypeError, ValueError) as exc:
+            self.logger.error(
+                f"AI model service returned an unexpected response: {exc}"
             )
-        except (ValueError, TypeError, KeyError) as e:
-            self.logger.error(f"AI model service returned an unexpected response: {e}")
-        return None
+            return None
+        if not self._validate_score(score):
+            self.logger.error(
+                f"AI model service returned an out-of-range score: {score}"
+            )
+            return None
+        return {
+            "score": score,
+            "confidence": max(0.0, min(1.0, confidence)),
+            "factors": payload.get("factors", []),
+            "model_name": payload.get("modelName"),
+            "model_version": payload.get("modelVersion"),
+        }
 
     @staticmethod
     def _event_epoch_seconds(value: Any) -> int:
-        """Convert an event_date to a Unix timestamp"""
         if isinstance(value, datetime):
             if value.tzinfo is None:
                 value = value.replace(tzinfo=timezone.utc)
@@ -1246,18 +1143,20 @@ class CreditScoringService:
     def _build_ai_history_records(
         self, scoring_data: Dict[str, Any]
     ) -> List[Dict[str, Any]]:
-        """Translate CreditHistory events into ai_models record format"""
         events = scoring_data.get("credit_history") or []
         wallet_address = scoring_data.get("wallet_address") or "unknown"
 
-        closed_timestamps_by_loan: Dict[str, int] = {}
+        closed_at: Dict[str, int] = {}
+        disbursed_loans = set()
         for event in events:
-            if event.get("event_type") == CreditEventType.LOAN_CLOSED.value:
-                loan_id = event.get("loan_id")
-                if loan_id:
-                    closed_timestamps_by_loan[loan_id] = self._event_epoch_seconds(
-                        event.get("event_date")
-                    )
+            loan_id = event.get("loan_id")
+            if not loan_id:
+                continue
+            event_type = event.get("event_type")
+            if event_type == CreditEventType.LOAN_CLOSED.value:
+                closed_at[loan_id] = self._event_epoch_seconds(event.get("event_date"))
+            elif event_type == CreditEventType.LOAN_DISBURSEMENT.value:
+                disbursed_loans.add(loan_id)
 
         records = []
         for event in events:
@@ -1269,9 +1168,11 @@ class CreditScoringService:
 
             if event_type == CreditEventType.LOAN_DISBURSEMENT.value:
                 record_type = "loan"
-                repayment_timestamp = closed_timestamps_by_loan.get(loan_id, 0)
+                repayment_timestamp = closed_at.get(loan_id, 0) if loan_id else 0
                 repaid = repayment_timestamp > 0
             elif event_type == CreditEventType.LOAN_CLOSED.value:
+                if loan_id and loan_id in disbursed_loans:
+                    continue
                 record_type = "loan"
                 repaid = True
                 repayment_timestamp = timestamp
@@ -1287,9 +1188,7 @@ class CreditScoringService:
                 repaid = False
                 repayment_timestamp = 0
             else:
-                record_type = "other"
-                repaid = False
-                repayment_timestamp = 0
+                continue
 
             records.append(
                 {
@@ -1304,52 +1203,7 @@ class CreditScoringService:
             )
         return records
 
-    @staticmethod
-    def _extract_local_model_features(
-        history_records: List[Dict[str, Any]],
-    ) -> Dict[str, float]:
-        """Re-derive the model's feature vector for the local-model fallback"""
-        total_records = len(history_records)
-        loan_count = 0
-        total_borrowed = 0.0
-        repaid_count = 0
-        repayment_times = []
-        for record in history_records:
-            if record["recordType"] == "loan":
-                loan_count += 1
-                total_borrowed += float(record["amount"])
-            if record["repaid"]:
-                repaid_count += 1
-                if record["repaymentTimestamp"] > 0:
-                    days_to_repay = (
-                        record["repaymentTimestamp"] - record["timestamp"]
-                    ) / (60 * 60 * 24)
-                    repayment_times.append(days_to_repay)
-        payment_history = repaid_count / total_records if total_records > 0 else 0
-        avg_loan = total_borrowed / loan_count if loan_count > 0 else 0
-        income_proxy = avg_loan * 10
-        active_debt = (
-            total_borrowed - repaid_count / total_records * total_borrowed
-            if total_records > 0
-            else 0
-        )
-        debt_ratio = min(active_debt / income_proxy, 1.0) if income_proxy > 0 else 0.5
-        avg_repayment_time = (
-            sum(repayment_times) / len(repayment_times) if repayment_times else 30
-        )
-        credit_utilization = min(avg_repayment_time / 90, 1.0)
-        return {
-            "income": income_proxy,
-            "debt_ratio": debt_ratio,
-            "payment_history": payment_history,
-            "loan_count": loan_count,
-            "loan_amount": avg_loan,
-            "age": 30,
-            "credit_utilization": credit_utilization,
-        }
-
     def _check_score_alerts(self, user_id: str, new_score: int, old_score: int) -> None:
-        """Check if score change warrants an alert"""
         if abs(new_score - old_score) >= 20:
             alert_type = "score_drop" if new_score < old_score else "score_increase"
             self._send_alert(user_id, alert_type, new_score, old_score)
@@ -1358,16 +1212,14 @@ class CreditScoringService:
         self,
         user_id: str,
         alert_type: str,
-        new_score: int = None,
-        old_score: int = None,
+        new_score: Optional[int] = None,
+        old_score: Optional[int] = None,
     ) -> None:
-        """Send alert for significant score changes (stub)"""
         self.logger.info(
             f"Alert [{alert_type}] for user {user_id}: {old_score} -> {new_score}"
         )
 
     def generate_credit_report(self, user_id: str) -> Dict[str, Any]:
-        """Generate a comprehensive credit report for user"""
         current = self.get_credit_score(user_id)
         history = self.get_credit_score_history(user_id, limit=12)
         factors = self.get_credit_factors(user_id)

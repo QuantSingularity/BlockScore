@@ -154,7 +154,7 @@ setup_python_environment() {
   fi
 
   # Install AI model training dependencies
-  AI_MODELS_REQUIREMENTS="${PROJECT_DIR}/code/ai_models/training_scripts/requirements.txt"
+  AI_MODELS_REQUIREMENTS="${PROJECT_DIR}/code/ai_models/requirements.txt"
   if [ -f "$AI_MODELS_REQUIREMENTS" ]; then
     echo -e "${YELLOW}Installing AI model Python dependencies...${NC}"
     if ! pip install -r "$AI_MODELS_REQUIREMENTS"; then
@@ -317,7 +317,7 @@ export BLOCKSCORE_PROVIDER_URL="http://localhost:8545"
 export BLOCKSCORE_PRIVATE_KEY="" # Add your private key for non-development deployments
 
 # AI Model Paths
-export BLOCKSCORE_MODEL_PATH="${PROJECT_DIR}/code/ai_models/trained_models"
+export MODEL_PATH="${PROJECT_DIR}/code/ai_models/artifacts/credit_scoring_model.pkl"
 EOF
 
     chmod +x "$ENV_FILE"

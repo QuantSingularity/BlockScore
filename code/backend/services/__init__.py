@@ -1,7 +1,3 @@
-"""
-Services package for BlockScore Backend
-"""
-
 from .audit_service import AuditService
 from .auth_service import AuthenticationService, AuthService
 from .blockchain_service import BlockchainService

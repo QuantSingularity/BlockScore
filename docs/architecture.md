@@ -113,15 +113,15 @@ User Submits → API Validation → Check Credit Score
 
 ## Module Mapping
 
-| Module          | Files                             | Purpose                |
-| --------------- | --------------------------------- | ---------------------- |
-| Backend API     | `code/backend/app.py`             | Main Flask application |
-| Models          | `code/backend/models/*.py`        | Database models        |
-| Services        | `code/backend/services/*.py`      | Business logic         |
-| AI Models       | `code/ai_models/*.py`             | ML models and training |
-| Smart Contracts | `code/blockchain/contracts/*.sol` | Solidity contracts     |
-| Web Frontend    | `web-frontend/src/`               | React components       |
-| Mobile Frontend | `mobile-frontend/`                | React Native app       |
+| Module          | Files                              | Purpose                |
+| --------------- | ---------------------------------- | ---------------------- |
+| Backend API     | `code/backend/app.py`              | Main Flask application |
+| Models          | `code/backend/models/*.py`         | Database models        |
+| Services        | `code/backend/services/*.py`       | Business logic         |
+| AI Models       | `code/ai_models/src/blockscore_ai` | ML models and training |
+| Smart Contracts | `code/blockchain/contracts/*.sol`  | Solidity contracts     |
+| Web Frontend    | `web-frontend/src/`                | React components       |
+| Mobile Frontend | `mobile-frontend/`                 | React Native app       |
 
 ## Deployment Architecture
 

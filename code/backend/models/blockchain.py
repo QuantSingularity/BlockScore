@@ -1,7 +1,3 @@
-"""
-Blockchain integration models for BlockScore Backend
-"""
-
 import enum
 import json
 import uuid
@@ -13,7 +9,6 @@ from marshmallow import Schema, fields, validate
 
 
 class TransactionStatus(enum.Enum):
-    """Blockchain transaction status enumeration"""
 
     PENDING = "pending"
     CONFIRMED = "confirmed"
@@ -22,7 +17,6 @@ class TransactionStatus(enum.Enum):
 
 
 class TransactionType(enum.Enum):
-    """Blockchain transaction type enumeration"""
 
     CREDIT_SCORE_UPDATE = "credit_score_update"
     LOAN_APPLICATION = "loan_application"
@@ -35,7 +29,6 @@ class TransactionType(enum.Enum):
 
 
 class ContractType(enum.Enum):
-    """Smart contract type enumeration"""
 
     CREDIT_SCORE = "credit_score"
     LOAN_AGREEMENT = "loan_agreement"
@@ -45,7 +38,6 @@ class ContractType(enum.Enum):
 
 
 class ContractStatus(enum.Enum):
-    """Smart contract status enumeration"""
 
     DEPLOYED = "deployed"
     ACTIVE = "active"
@@ -55,7 +47,6 @@ class ContractStatus(enum.Enum):
 
 
 class BlockchainTransaction(db.Model):
-    """Blockchain transaction tracking"""
 
     __tablename__ = "blockchain_transactions"
     id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
@@ -101,7 +92,6 @@ class BlockchainTransaction(db.Model):
     )
 
     def get_input_data(self) -> Dict[str, Any]:
-        """Get parsed input data"""
         if self.input_data:
             try:
                 return json.loads(self.input_data)
@@ -110,11 +100,9 @@ class BlockchainTransaction(db.Model):
         return {}
 
     def set_input_data(self, data: Any) -> None:
-        """Set input data as JSON"""
         self.input_data = json.dumps(data) if data else None
 
     def get_output_data(self) -> Dict[str, Any]:
-        """Get parsed output data"""
         if self.output_data:
             try:
                 return json.loads(self.output_data)
@@ -123,11 +111,9 @@ class BlockchainTransaction(db.Model):
         return {}
 
     def set_output_data(self, data: Any) -> None:
-        """Set output data as JSON"""
         self.output_data = json.dumps(data) if data else None
 
     def get_token_transfers(self) -> List[Any]:
-        """Get parsed token transfers"""
         if self.token_transfers:
             try:
                 return json.loads(self.token_transfers)
@@ -136,24 +122,20 @@ class BlockchainTransaction(db.Model):
         return []
 
     def set_token_transfers(self, transfers: Any) -> None:
-        """Set token transfers as JSON"""
         self.token_transfers = json.dumps(transfers) if transfers else None
 
     def is_confirmed(self) -> bool:
-        """Check if transaction is confirmed"""
         return (
             self.status == TransactionStatus.CONFIRMED
             and self.confirmation_count >= self.required_confirmations
         )
 
     def calculate_transaction_fee_usd(self, eth_price_usd: Any = None) -> float:
-        """Calculate transaction fee in USD"""
         if self.transaction_fee and eth_price_usd:
             return float(self.transaction_fee) * eth_price_usd
         return None
 
     def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary for JSON serialization"""
         return {
             "id": self.id,
             "transaction_hash": self.transaction_hash,
@@ -197,7 +179,6 @@ class BlockchainTransaction(db.Model):
 
 
 class SmartContract(db.Model):
-    """Smart contract registry and management"""
 
     __tablename__ = "smart_contracts"
     id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
@@ -237,7 +218,6 @@ class SmartContract(db.Model):
     )
 
     def get_abi(self) -> List[Any]:
-        """Get parsed ABI"""
         if self.abi:
             try:
                 return json.loads(self.abi)
@@ -246,11 +226,9 @@ class SmartContract(db.Model):
         return []
 
     def set_abi(self, abi: Any) -> None:
-        """Set ABI as JSON"""
         self.abi = json.dumps(abi) if abi else None
 
     def get_constructor_args(self) -> List[Any]:
-        """Get parsed constructor arguments"""
         if self.constructor_args:
             try:
                 return json.loads(self.constructor_args)
@@ -259,11 +237,9 @@ class SmartContract(db.Model):
         return []
 
     def set_constructor_args(self, args: Any) -> None:
-        """Set constructor arguments as JSON"""
         self.constructor_args = json.dumps(args) if args else None
 
     def get_audit_reports(self) -> List[Any]:
-        """Get parsed audit reports"""
         if self.audit_reports:
             try:
                 return json.loads(self.audit_reports)
@@ -272,11 +248,9 @@ class SmartContract(db.Model):
         return []
 
     def set_audit_reports(self, reports: Any) -> None:
-        """Set audit reports as JSON"""
         self.audit_reports = json.dumps(reports) if reports else None
 
     def get_known_vulnerabilities(self) -> List[Any]:
-        """Get parsed known vulnerabilities"""
         if self.known_vulnerabilities:
             try:
                 return json.loads(self.known_vulnerabilities)
@@ -285,17 +259,14 @@ class SmartContract(db.Model):
         return []
 
     def set_known_vulnerabilities(self, vulnerabilities: Any) -> None:
-        """Set known vulnerabilities as JSON"""
         self.known_vulnerabilities = (
             json.dumps(vulnerabilities) if vulnerabilities else None
         )
 
     def is_active(self) -> bool:
-        """Check if contract is active"""
         return self.status == ContractStatus.ACTIVE
 
     def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary for JSON serialization"""
         return {
             "id": self.id,
             "contract_address": self.contract_address,
@@ -331,7 +302,6 @@ class SmartContract(db.Model):
 
 
 class BlockchainTransactionSchema(Schema):
-    """Schema for blockchain transaction serialization"""
 
     id = fields.Str(dump_only=True)
     transaction_hash = fields.Str(dump_only=True)
@@ -364,7 +334,6 @@ class BlockchainTransactionSchema(Schema):
 
 
 class SmartContractSchema(Schema):
-    """Schema for smart contract serialization"""
 
     id = fields.Str(dump_only=True)
     contract_address = fields.Str(dump_only=True)
@@ -393,7 +362,6 @@ class SmartContractSchema(Schema):
 
 
 class TransactionSubmissionSchema(Schema):
-    """Schema for transaction submission"""
 
     transaction_type = fields.Str(
         required=True, validate=validate.OneOf([e.value for e in TransactionType])
@@ -408,7 +376,6 @@ class TransactionSubmissionSchema(Schema):
 
 
 class ContractDeploymentSchema(Schema):
-    """Schema for smart contract deployment"""
 
     contract_name = fields.Str(required=True, validate=validate.Length(min=1, max=100))
     contract_type = fields.Str(

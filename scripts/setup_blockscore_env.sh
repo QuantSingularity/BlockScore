@@ -31,7 +31,7 @@ echo "Changed directory to $(pwd)"
 echo ""
 echo "Setting up BlockScore AI Models environment..."
 AI_MODELS_DIR="${PROJECT_DIR}/code/ai_models"
-AI_MODELS_REQUIREMENTS="${AI_MODELS_DIR}/training_scripts/requirements.txt"
+AI_MODELS_REQUIREMENTS="${AI_MODELS_DIR}/requirements.txt"
 
 if [ ! -d "${AI_MODELS_DIR}" ]; then
     echo "Error: AI Models directory ${AI_MODELS_DIR} not found."

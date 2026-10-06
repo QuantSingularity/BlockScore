@@ -1,10 +1,3 @@
-import compat_stubs  # noqa
-
-"""
-Database Optimizer for BlockScore Backend
-Database performance optimization and monitoring utilities
-"""
-
 import logging
 import time
 from contextlib import contextmanager
@@ -21,7 +14,6 @@ except ImportError:
 
 
 class DatabaseOptimizer:
-    """Database performance optimization and monitoring"""
 
     def __init__(self, db: Any, engine: Engine) -> None:
         self.db = db
@@ -33,7 +25,6 @@ class DatabaseOptimizer:
     def analyze_query_performance(
         self, query: str, params: Dict = None
     ) -> Dict[str, Any]:
-        """Analyze query performance"""
         try:
             start_time = time.time()
             with self.engine.connect() as conn:
@@ -75,7 +66,6 @@ class DatabaseOptimizer:
             return {"error": str(e)}
 
     def get_slow_queries(self, limit: int = 10) -> List[Dict[str, Any]]:
-        """Get slowest queries"""
         slow_queries = []
         for stats in self.query_stats.values():
             if stats["avg_time"] > self.slow_query_threshold:
@@ -84,8 +74,9 @@ class DatabaseOptimizer:
         return slow_queries[:limit]
 
     def analyze_table_statistics(self, table_name: str) -> Dict[str, Any]:
-        """Analyze table statistics"""
         try:
+            if not inspect(self.engine).has_table(table_name):
+                return {"table_name": table_name, "error": "Unknown table"}
             with self.engine.connect() as conn:
                 size_query = text(
                     "\n                    SELECT\n                        pg_size_pretty(pg_total_relation_size(:table_name)) as total_size,\n                        pg_size_pretty(pg_relation_size(:table_name)) as table_size,\n                        pg_size_pretty(pg_total_relation_size(:table_name) - pg_relation_size(:table_name)) as index_size\n                "
@@ -93,7 +84,8 @@ class DatabaseOptimizer:
                 size_result = conn.execute(
                     size_query, {"table_name": table_name}
                 ).fetchone()
-                count_query = text(f"SELECT COUNT(*) FROM {table_name}")
+                quoted_table = self.engine.dialect.identifier_preparer.quote(table_name)
+                count_query = text(f"SELECT COUNT(*) FROM {quoted_table}")
                 row_count = conn.execute(count_query).scalar()
                 stats_query = text(
                     "\n                    SELECT\n                        schemaname,\n                        tablename,\n                        attname,\n                        n_distinct,\n                        most_common_vals,\n                        most_common_freqs,\n                        histogram_bounds\n                    FROM pg_stats\n                    WHERE tablename = :table_name\n                "
@@ -115,7 +107,6 @@ class DatabaseOptimizer:
             return {"error": str(e)}
 
     def check_index_usage(self, table_name: str) -> Dict[str, Any]:
-        """Check index usage statistics"""
         try:
             with self.engine.connect() as conn:
                 index_query = text(
@@ -145,7 +136,6 @@ class DatabaseOptimizer:
     def suggest_indexes(
         self, table_name: str, query_patterns: List[str] = None
     ) -> List[Dict[str, Any]]:
-        """Suggest indexes based on query patterns"""
         suggestions = []
         try:
             inspector = inspect(self.engine)
@@ -231,7 +221,6 @@ class DatabaseOptimizer:
             return []
 
     def optimize_table(self, table_name: str) -> Dict[str, Any]:
-        """Perform table optimization"""
         results = {
             "table_name": table_name,
             "actions_performed": [],
@@ -268,7 +257,6 @@ class DatabaseOptimizer:
         return results
 
     def get_database_health(self) -> Dict[str, Any]:
-        """Get overall database health metrics"""
         health = {
             "connection_status": "unknown",
             "active_connections": 0,
@@ -304,7 +292,6 @@ class DatabaseOptimizer:
         return health
 
     def monitor_connections(self) -> Dict[str, Any]:
-        """Monitor database connections"""
         try:
             with self.engine.connect() as conn:
                 conn_query = text(
@@ -330,7 +317,6 @@ class DatabaseOptimizer:
     def _get_query_plan(
         self, query: str, params: Optional[Dict] = None
     ) -> Optional[List[Dict]]:
-        """Get query execution plan"""
         try:
             with self.engine.connect() as conn:
                 explain_query = f"EXPLAIN (FORMAT JSON, ANALYZE, BUFFERS) {query}"
@@ -346,7 +332,6 @@ class DatabaseOptimizer:
 
     @contextmanager
     def query_profiler(self, query_name: str = "unnamed") -> Any:
-        """Context manager for profiling queries"""
         start_time = time.time()
         try:
             yield
@@ -359,7 +344,6 @@ class DatabaseOptimizer:
                 )
 
     def create_maintenance_plan(self) -> Dict[str, Any]:
-        """Create database maintenance plan"""
         plan = {
             "daily_tasks": [
                 "Update table statistics (ANALYZE)",
@@ -394,6 +378,5 @@ class DatabaseOptimizer:
         return plan
 
     def reset_stats(self) -> Any:
-        """Reset query statistics"""
         self.query_stats.clear()
         self.logger.info("Query statistics reset")

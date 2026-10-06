@@ -1,10 +1,3 @@
-import compat_stubs  # noqa
-
-"""
-Authentication Service for BlockScore Backend
-Implements financial industry security standards
-"""
-
 import base64
 import hashlib
 import io
@@ -35,7 +28,6 @@ EMAIL_REGEX = re.compile(r"^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$")
 
 
 class AuthService:
-    """Authentication service with enterprise security features"""
 
     def __init__(
         self, db: Any, bcrypt: Bcrypt = None, redis_client: Optional[redis.Redis] = None
@@ -50,12 +42,7 @@ class AuthService:
         self.mfa_window = 1
         self.jwt_secret = None
 
-    # ------------------------------------------------------------------
-    # Public API methods expected by tests
-    # ------------------------------------------------------------------
-
     def register_user(self, user_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Register a new user (returns dict with success/message/user_id)"""
         try:
             email = user_data.get("email", "").strip().lower()
             password = user_data.get("password", "")
@@ -117,7 +104,6 @@ class AuthService:
             raise
 
     def create_user(self, email: str, password: str, **kwargs) -> User:
-        """Create a new user object (used by app.py register route)"""
         result = self.register_user({"email": email, "password": password, **kwargs})
         if not result["success"]:
             raise ValueError(result["message"])
@@ -131,7 +117,6 @@ class AuthService:
         user_agent: str = None,
         mfa_code: str = None,
     ) -> Dict[str, Any]:
-        """Authenticate user; always returns a dict with success/message/tokens."""
         return self._authenticate_internal(
             email, password, ip_address, user_agent, mfa_code, return_dict=True
         )
@@ -144,7 +129,6 @@ class AuthService:
         user_agent: str = None,
         mfa_code: str = None,
     ) -> Dict[str, Any]:
-        """Authenticate user returning a dict result for service consumers"""
         return self._authenticate_internal(
             email, password, ip_address, user_agent, mfa_code, return_dict=True
         )
@@ -265,7 +249,6 @@ class AuthService:
             raise
 
     def revoke_session(self, user_id: str, session_id: Optional[str] = None) -> Any:
-        """Revoke user session(s). Returns dict when called with session_id, else bool."""
         try:
             if session_id:
                 session = UserSession.query.filter_by(
@@ -294,7 +277,6 @@ class AuthService:
             return False
 
     def logout_user(self, user_id: str, session_token: str) -> Dict[str, Any]:
-        """Logout user by revoking a specific session by token"""
         try:
             session = UserSession.query.filter_by(
                 user_id=user_id, session_token=session_token, is_active=True
@@ -314,7 +296,6 @@ class AuthService:
             return {"success": False, "message": str(e)}
 
     def refresh_token(self, refresh_token_value: str) -> Dict[str, Any]:
-        """Refresh an access token using a session's refresh_token / session_token"""
         try:
             session = (
                 UserSession.query.filter(
@@ -356,7 +337,6 @@ class AuthService:
             return {"success": False, "message": str(e)}
 
     def validate_token(self, token: str) -> Dict[str, Any]:
-        """Validate a JWT access token"""
         try:
             import jwt as pyjwt
             from flask import current_app
@@ -372,7 +352,6 @@ class AuthService:
             return {"valid": False, "message": "Invalid token"}
 
     def request_password_reset(self, email: str) -> Dict[str, Any]:
-        """Request a password reset token"""
         try:
             user = User.query.filter_by(email=email.lower().strip()).first()
             if not user:
@@ -394,7 +373,6 @@ class AuthService:
             return {"success": False, "message": str(e)}
 
     def reset_password(self, reset_token: str, new_password: str) -> Dict[str, Any]:
-        """Reset password using a reset token"""
         try:
             user = User.query.filter_by(password_reset_token=reset_token).first()
             if not user:
@@ -425,7 +403,6 @@ class AuthService:
     def change_password(
         self, user_id: str, current_password: str, new_password: str
     ) -> Dict[str, Any]:
-        """Change user password with security validations"""
         try:
             user = db.session.get(User, user_id)
             if not user:
@@ -448,7 +425,6 @@ class AuthService:
             raise
 
     def setup_mfa(self, user_id: str) -> Dict[str, Any]:
-        """Set up multi-factor authentication for user"""
         try:
             user = db.session.get(User, user_id)
             if not user:
@@ -481,7 +457,6 @@ class AuthService:
             raise
 
     def enable_mfa(self, user_id: str, verification_code: str = None) -> Dict[str, Any]:
-        """Enable MFA: sets up secret if not set, verifies if code provided"""
         try:
             user = db.session.get(User, user_id)
             if not user:
@@ -511,7 +486,6 @@ class AuthService:
             raise
 
     def verify_mfa_token(self, user_id: str, code: str) -> Dict[str, Any]:
-        """Verify a TOTP MFA token for a user"""
         try:
             user = db.session.get(User, user_id)
             if not user or not user.mfa_secret:
@@ -525,7 +499,6 @@ class AuthService:
     def disable_mfa(
         self, user_id: str, verification_code: str = None, password: str = None
     ) -> Dict[str, Any]:
-        """Disable MFA with proper verification"""
         try:
             user = db.session.get(User, user_id)
             if not user:
@@ -549,7 +522,6 @@ class AuthService:
             return {"success": False, "message": str(e)}
 
     def get_user_sessions(self, user_id: str) -> List[Dict[str, Any]]:
-        """Get all active sessions for a user"""
         sessions = (
             UserSession.query.filter_by(user_id=user_id, is_active=True)
             .order_by(UserSession.last_activity.desc())
@@ -586,12 +558,7 @@ class AuthService:
             "is_locked": user.is_locked(),
         }
 
-    # ------------------------------------------------------------------
-    # Internal / helper methods
-    # ------------------------------------------------------------------
-
     def _validate_password(self, password: str) -> Dict[str, Any]:
-        """Validate password meets security requirements. Returns dict."""
         if not password or len(password) < self.password_min_length:
             return {
                 "valid": False,
@@ -620,17 +587,14 @@ class AuthService:
         return {"valid": True, "message": "Password is strong"}
 
     def _validate_password_strength(self, password: str) -> bool:
-        """Validate password meets security requirements (legacy boolean API)"""
         return self._validate_password(password)["valid"]
 
     def _validate_email(self, email: str) -> bool:
-        """Validate email format"""
         if not email:
             return False
         return bool(EMAIL_REGEX.match(email))
 
     def _verify_password(self, password_hash: str, password: str) -> bool:
-        """Verify a plain password against its hash"""
         if self.bcrypt:
             try:
                 return self.bcrypt.check_password_hash(password_hash, password)
@@ -644,7 +608,6 @@ class AuthService:
             return False
 
     def _hash_password(self, password: str) -> str:
-        """Hash a plain password"""
         if self.bcrypt:
             return self.bcrypt.generate_password_hash(password).decode("utf-8")
         from flask_bcrypt import generate_password_hash
@@ -652,7 +615,6 @@ class AuthService:
         return generate_password_hash(password).decode("utf-8")
 
     def _generate_access_token(self, user_id: str) -> str:
-        """Generate a JWT-like access token (fallback when outside app context)"""
         import time
 
         import jwt as pyjwt
@@ -672,7 +634,6 @@ class AuthService:
         return pyjwt.encode(payload, secret, algorithm="HS256")
 
     def _verify_mfa_code(self, user: User, code: str) -> bool:
-        """Verify MFA code (TOTP or backup code)"""
         if not user.mfa_secret:
             return False
         totp = pyotp.TOTP(user.mfa_secret)
@@ -806,5 +767,4 @@ class AuthService:
             logger.debug(f"Failed to log security alert: {e}")
 
 
-# Alias so tests can import AuthenticationService
 AuthenticationService = AuthService

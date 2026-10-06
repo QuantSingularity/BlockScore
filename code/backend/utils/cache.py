@@ -1,14 +1,6 @@
-import compat_stubs  # noqa
-
-"""
-Cache Manager for BlockScore Backend
-Redis-based caching for performance optimization
-"""
-
 import hashlib
 import json
 import logging
-import pickle
 from datetime import datetime, timezone
 from functools import wraps
 from typing import Any, Dict, List, Optional, Union
@@ -23,7 +15,6 @@ except ImportError:
 
 
 class CacheManager:
-    """Redis-based cache manager with advanced features"""
 
     def __init__(
         self,
@@ -38,11 +29,9 @@ class CacheManager:
         self.stats = {"hits": 0, "misses": 0, "sets": 0, "deletes": 0}
         self.serializers = {
             "json": (json.dumps, json.loads),
-            "pickle": (pickle.dumps, pickle.loads),
         }
 
     def is_available(self) -> bool:
-        """Check if Redis cache is available"""
         if not self.redis:
             return False
         try:
@@ -53,7 +42,6 @@ class CacheManager:
             return False
 
     def get(self, key: str, default: Any = None, serializer: str = "json") -> Any:
-        """Get value from cache"""
         if not self.is_available():
             return default
         try:
@@ -74,7 +62,6 @@ class CacheManager:
     def set(
         self, key: str, value: Any, ttl: Optional[int] = None, serializer: str = "json"
     ) -> bool:
-        """Set value in cache"""
         if not self.is_available():
             return False
         try:
@@ -91,7 +78,6 @@ class CacheManager:
             return False
 
     def delete(self, key: str) -> bool:
-        """Delete key from cache"""
         if not self.is_available():
             return False
         try:
@@ -105,7 +91,6 @@ class CacheManager:
             return False
 
     def exists(self, key: str) -> bool:
-        """Check if key exists in cache"""
         if not self.is_available():
             return False
         try:
@@ -116,7 +101,6 @@ class CacheManager:
             return False
 
     def expire(self, key: str, ttl: int) -> bool:
-        """Set expiration time for key"""
         if not self.is_available():
             return False
         try:
@@ -127,7 +111,6 @@ class CacheManager:
             return False
 
     def ttl(self, key: str) -> int:
-        """Get time to live for key"""
         if not self.is_available():
             return -1
         try:
@@ -138,7 +121,6 @@ class CacheManager:
             return -1
 
     def clear_pattern(self, pattern: str) -> int:
-        """Clear all keys matching pattern"""
         if not self.is_available():
             return 0
         try:
@@ -154,7 +136,6 @@ class CacheManager:
             return 0
 
     def clear_all(self) -> bool:
-        """Clear all cache keys with prefix"""
         if not self.is_available():
             return False
         try:
@@ -170,7 +151,6 @@ class CacheManager:
             return False
 
     def get_multi(self, keys: List[str], serializer: str = "json") -> Dict[str, Any]:
-        """Get multiple values from cache"""
         if not self.is_available():
             return {}
         try:
@@ -197,7 +177,6 @@ class CacheManager:
     def set_multi(
         self, data: Dict[str, Any], ttl: Optional[int] = None, serializer: str = "json"
     ) -> bool:
-        """Set multiple values in cache"""
         if not self.is_available():
             return False
         try:
@@ -219,7 +198,6 @@ class CacheManager:
     def increment(
         self, key: str, amount: int = 1, ttl: Optional[int] = None
     ) -> Optional[int]:
-        """Increment counter in cache"""
         if not self.is_available():
             return None
         try:
@@ -235,7 +213,6 @@ class CacheManager:
             return None
 
     def decrement(self, key: str, amount: int = 1) -> Optional[int]:
-        """Decrement counter in cache"""
         if not self.is_available():
             return None
         try:
@@ -246,7 +223,6 @@ class CacheManager:
             return None
 
     def get_stats(self) -> Dict[str, Any]:
-        """Get cache statistics"""
         total_operations = sum(self.stats.values())
         hit_rate = (
             self.stats["hits"] / (self.stats["hits"] + self.stats["misses"]) * 100
@@ -276,7 +252,6 @@ class CacheManager:
         return stats
 
     def health_check(self) -> Dict[str, Any]:
-        """Perform cache health check"""
         health = {"available": False, "latency_ms": None, "error": None}
         if not self.is_available():
             health["error"] = "Redis not available"
@@ -296,15 +271,13 @@ class CacheManager:
         return health
 
     def _build_key(self, key: str) -> str:
-        """Build cache key with prefix"""
         return f"{self.key_prefix}:{key}"
 
     def _hash_key(self, data: Union[str, Dict, List]) -> str:
-        """Generate hash for complex keys"""
         if isinstance(data, str):
             return data
         json_str = json.dumps(data, sort_keys=True)
-        return hashlib.md5(json_str.encode()).hexdigest()
+        return hashlib.sha256(json_str.encode()).hexdigest()
 
 
 def cached(
@@ -313,7 +286,6 @@ def cached(
     key_prefix: str = "",
     serializer: str = "json",
 ) -> Any:
-    """Decorator to cache function results"""
 
     def decorator(func):
 
@@ -344,7 +316,6 @@ def cached(
 
 
 def cache_invalidate(cache_manager: CacheManager, patterns: List[str]) -> Any:
-    """Decorator to invalidate cache patterns after function execution"""
 
     def decorator(func):
 
@@ -361,14 +332,12 @@ def cache_invalidate(cache_manager: CacheManager, patterns: List[str]) -> Any:
 
 
 class CacheWarmer:
-    """Utility for warming up cache with frequently accessed data"""
 
     def __init__(self, cache_manager: CacheManager) -> None:
         self.cache = cache_manager
         self.logger = logging.getLogger(__name__)
 
     def warm_user_data(self, user_ids: List[str]) -> Dict[str, Any]:
-        """Warm cache with user data"""
         results = {"success": 0, "failed": 0}
         for user_id in user_ids:
             try:
@@ -388,7 +357,6 @@ class CacheWarmer:
         return results
 
     def warm_credit_scores(self, user_ids: List[str]) -> Dict[str, Any]:
-        """Warm cache with credit score data"""
         results = {"success": 0, "failed": 0}
         for user_id in user_ids:
             try:

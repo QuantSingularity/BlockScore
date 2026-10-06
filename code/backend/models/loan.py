@@ -1,7 +1,3 @@
-"""
-Loan management models for BlockScore Backend
-"""
-
 import enum
 import json
 import uuid

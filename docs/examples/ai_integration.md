@@ -9,7 +9,7 @@ import joblib
 import pandas as pd
 
 # Load credit scoring model
-model = joblib.load('code/ai_models/credit_scoring_model.py')
+model = joblib.load('code/ai_models/artifacts/credit_scoring_model.pkl')
 
 # Prepare features
 features = {
@@ -39,7 +39,7 @@ for feature, imp in zip(features.keys(), importance):
 import requests
 
 # AI Model API
-AI_API_URL = "http://localhost:5001"  # If running ai_models/api.py
+AI_API_URL = "http://localhost:5001"  # If running code/ai_models (make serve)
 
 # Prepare blockchain data
 blockchain_data = {

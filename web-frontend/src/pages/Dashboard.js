@@ -16,10 +16,10 @@ import { useNavigate } from "react-router-dom";
 import CreditFactors from "../components/dashboard/CreditFactors";
 import CreditScoreGauge from "../components/dashboard/CreditScoreGauge";
 import QuickActions from "../components/dashboard/QuickActions";
+import ScoreInsights from "../components/dashboard/ScoreInsights";
 import TransactionHistory from "../components/dashboard/TransactionHistory";
 import { useAuth } from "../contexts/AuthContext";
 import { useCredit } from "../contexts/CreditContext";
-
 const gradeColor = {
   Excellent: "success",
   "Very Good": "success",
@@ -27,7 +27,6 @@ const gradeColor = {
   Fair: "warning",
   Poor: "error",
 };
-
 const Dashboard = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -40,18 +39,16 @@ const Dashboard = () => {
     recalculateCreditScore,
   } = useCredit();
   const [recalculating, setRecalculating] = useState(false);
-
   const handleRecalculate = async () => {
     setRecalculating(true);
     try {
       await recalculateCreditScore();
     } catch {
-      // Error state is already surfaced via the credit context.
+      return;
     } finally {
       setRecalculating(false);
     }
   };
-
   if (loading) {
     return (
       <Box
@@ -66,7 +63,6 @@ const Dashboard = () => {
       </Box>
     );
   }
-
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -117,7 +113,6 @@ const Dashboard = () => {
       )}
 
       <Grid container spacing={3}>
-        {/* Credit Score Card */}
         <Grid item xs={12} md={6} lg={4}>
           <motion.div
             initial={{ y: 16, opacity: 0 }}
@@ -173,7 +168,9 @@ const Dashboard = () => {
                   align="center"
                 >
                   {creditData?.calculated_at
-                    ? `Last updated ${new Date(creditData.calculated_at).toLocaleDateString()}`
+                    ? `Last updated ${new Date(
+                        creditData.calculated_at,
+                      ).toLocaleDateString()}`
                     : "Not calculated yet"}
                 </Typography>
 
@@ -186,14 +183,13 @@ const Dashboard = () => {
                   onClick={handleRecalculate}
                   disabled={recalculating}
                 >
-                  {recalculating ? "Recalculating…" : "Recalculate score"}
+                  {recalculating ? "Recalculating..." : "Recalculate score"}
                 </Button>
               </Box>
             </Card>
           </motion.div>
         </Grid>
 
-        {/* Credit Factors */}
         <Grid item xs={12} md={6} lg={4}>
           <motion.div
             initial={{ y: 16, opacity: 0 }}
@@ -205,7 +201,6 @@ const Dashboard = () => {
           </motion.div>
         </Grid>
 
-        {/* Quick Actions */}
         <Grid item xs={12} md={6} lg={4}>
           <motion.div
             initial={{ y: 16, opacity: 0 }}
@@ -222,7 +217,18 @@ const Dashboard = () => {
           </motion.div>
         </Grid>
 
-        {/* Credit History */}
+        {creditData?.scoring_source && (
+          <Grid item xs={12}>
+            <motion.div
+              initial={{ y: 16, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ duration: 0.4, delay: 0.18 }}
+            >
+              <ScoreInsights creditData={creditData} />
+            </motion.div>
+          </Grid>
+        )}
+
         <Grid item xs={12}>
           <motion.div
             initial={{ y: 16, opacity: 0 }}
@@ -236,5 +242,4 @@ const Dashboard = () => {
     </motion.div>
   );
 };
-
 export default Dashboard;

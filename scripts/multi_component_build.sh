@@ -291,7 +291,7 @@ build_component() {
     ai)
       if [ -d "${PROJECT_DIR}/code/ai_models" ]; then
         cd "${PROJECT_DIR}/code/ai_models"
-        local requirements_file="training_scripts/requirements.txt"
+        local requirements_file="requirements.txt"
         if [ -f "$requirements_file" ]; then
           ensure_venv
           pip install -r "$requirements_file" || build_status=$?

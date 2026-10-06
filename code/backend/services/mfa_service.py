@@ -1,8 +1,3 @@
-"""
-Multi-Factor Authentication (MFA) Service for Financial Applications
-Implements TOTP, SMS, and backup codes for enhanced security
-"""
-
 import base64
 import io
 import json
@@ -22,7 +17,6 @@ logger = logging.getLogger(__name__)
 
 
 class MFAMethod:
-    """MFA method enumeration"""
 
     TOTP = "totp"
     SMS = "sms"
@@ -32,7 +26,6 @@ class MFAMethod:
 
 
 class MFAService:
-    """Multi-Factor Authentication service for enhanced security"""
 
     def __init__(self, db_session: Any) -> None:
         self.db = db_session
@@ -47,12 +40,7 @@ class MFAService:
         self.sms_provider_url = os.environ.get("SMS_PROVIDER_URL")
         self.sms_api_key = os.environ.get("SMS_API_KEY")
 
-    # -----------------------------------------------------------------------
-    # Public convenience methods used by tests
-    # -----------------------------------------------------------------------
-
     def setup_totp(self, user_id: Any) -> Dict[str, Any]:
-        """Set up TOTP for a user and return secret + QR code"""
         try:
             user = db.session.get(User, user_id)
             if not user:
@@ -66,7 +54,6 @@ class MFAService:
             )
             qr_code_data = self._generate_qr_code(provisioning_uri)
 
-            # Store pending secret on the user object directly
             user.mfa_secret = secret
             try:
                 self.db.commit()
@@ -95,7 +82,6 @@ class MFAService:
             return {"success": False, "message": str(e)}
 
     def verify_totp(self, user_id: Any, code: str) -> Dict[str, Any]:
-        """Verify a TOTP code for a user"""
         try:
             user = db.session.get(User, user_id)
             if not user:
@@ -116,7 +102,6 @@ class MFAService:
             return {"valid": False, "message": str(e)}
 
     def enable_mfa(self, user_id: Any, verification_code: str) -> Dict[str, Any]:
-        """Enable MFA after verifying the setup code"""
         try:
             user = db.session.get(User, user_id)
             if not user:
@@ -154,7 +139,6 @@ class MFAService:
             return {"success": False, "message": str(e)}
 
     def disable_mfa(self, user_id: Any, verification_code: str) -> Dict[str, Any]:
-        """Disable MFA after verifying the TOTP code"""
         try:
             user = db.session.get(User, user_id)
             if not user:
@@ -199,7 +183,6 @@ class MFAService:
             return {"success": False, "message": str(e)}
 
     def get_mfa_status(self, user_id: Any) -> Dict[str, Any]:
-        """Get MFA status for a user"""
         try:
             user = db.session.get(User, user_id)
             if not user:
@@ -237,7 +220,6 @@ class MFAService:
             }
 
     def verify_backup_code(self, user_id: Any, code: str) -> Dict[str, Any]:
-        """Verify and consume a backup code"""
         try:
             user = db.session.get(User, user_id)
             if not user:
@@ -262,7 +244,6 @@ class MFAService:
             return {"valid": False, "message": str(e)}
 
     def _generate_backup_codes(self, user_id_or_count: Any = None) -> List[str]:
-        """Generate backup codes. Accepts count (int <= 100) or user_id."""
         count = self.backup_codes_count
         user_id = None
 
@@ -289,7 +270,6 @@ class MFAService:
         return codes
 
     def _generate_qr_code(self, data: str) -> str:
-        """Generate QR code as base64 encoded PNG"""
         try:
             qr = qrcode.QRCode(version=1, box_size=10, border=5)
             qr.add_data(data)
@@ -314,7 +294,6 @@ class MFAService:
         event_data: Dict = None,
         severity: AuditSeverity = AuditSeverity.LOW,
     ) -> None:
-        """Safe audit log wrapper"""
         try:
             self.audit_service.log_event(
                 event_type=event_type,
@@ -326,18 +305,12 @@ class MFAService:
         except Exception as e:
             logger.warning(f"Audit log failed: {e}")
 
-    # -----------------------------------------------------------------------
-    # Legacy / advanced methods kept for compatibility with app routes
-    # -----------------------------------------------------------------------
-
     def setup_sms_mfa(self, user_id: int, phone_number: str) -> Dict[str, Any]:
-        """Set up SMS-based MFA"""
         return {"success": False, "error": "SMS MFA requires external SMS provider"}
 
     def verify_mfa(
         self, user_id: int, method: str, code: str, backup_code: Optional[str] = None
     ) -> Dict[str, Any]:
-        """Verify MFA code during authentication"""
         if backup_code:
             return self.verify_backup_code(user_id, backup_code)
         if method == MFAMethod.TOTP:
@@ -346,7 +319,6 @@ class MFAService:
         return {"success": False, "error": "Unsupported MFA method"}
 
     def regenerate_backup_codes(self, user_id: int) -> Dict[str, Any]:
-        """Regenerate backup codes for user"""
         try:
             user = db.session.get(User, user_id)
             if not user:

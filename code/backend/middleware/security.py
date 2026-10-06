@@ -1,8 +1,3 @@
-"""
-Security Middleware for Financial Services
-Implements comprehensive security controls for financial applications
-"""
-
 import base64
 import hashlib
 import hmac
@@ -23,7 +18,6 @@ from services.audit_service import AuditService
 
 
 class SecurityMiddleware:
-    """Comprehensive security middleware for financial applications"""
 
     def __init__(self, app: Any = None, redis_client: Any = None) -> None:
         self.app = app
@@ -42,7 +36,6 @@ class SecurityMiddleware:
             self.init_app(app)
 
     def init_app(self, app: Any) -> Any:
-        """Initialize security middleware with Flask app"""
         self.app = app
         self.audit_service = AuditService(app.extensions.get("sqlalchemy").db)
         app.before_request(self.before_request)
@@ -51,7 +44,6 @@ class SecurityMiddleware:
         app.errorhandler(429)(self.rate_limit_exceeded)
 
     def _init_encryption(self) -> Any:
-        """Initialize encryption components"""
         key = os.environ.get("ENCRYPTION_KEY")
         if not key:
             key = Fernet.generate_key()
@@ -61,7 +53,6 @@ class SecurityMiddleware:
         self.cipher_suite = Fernet(key)
 
     def before_request(self) -> Any:
-        """Security checks before processing request"""
         try:
             g.request_start_time = time.time()
             g.request_id = self._generate_request_id()
@@ -111,7 +102,6 @@ class SecurityMiddleware:
             )
 
     def after_request(self, response: Any) -> Any:
-        """Security headers and logging after request processing"""
         try:
             response.headers["X-Content-Type-Options"] = "nosniff"
             response.headers["X-Frame-Options"] = "DENY"
@@ -143,13 +133,11 @@ class SecurityMiddleware:
             return response
 
     def _generate_request_id(self) -> str:
-        """Generate unique request ID"""
         return hashlib.sha256(
             f"{time.time()}{request.remote_addr}{request.user_agent}".encode()
         ).hexdigest()[:16]
 
     def _is_ip_blocked(self, ip_address: str) -> bool:
-        """Check if IP address is blocked"""
         try:
             if ip_address in self.blocked_ips:
                 return True
@@ -163,7 +151,6 @@ class SecurityMiddleware:
             return False
 
     def _check_rate_limit(self) -> bool:
-        """Check rate limiting for current request"""
         try:
             if not self.redis_client:
                 return True
@@ -200,7 +187,6 @@ class SecurityMiddleware:
             return True
 
     def _validate_input(self) -> bool:
-        """Validate request input for security threats"""
         try:
             sql_patterns = [
                 "(\\b(SELECT|INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|EXEC|UNION)\\b)",
@@ -278,7 +264,6 @@ class SecurityMiddleware:
             return True
 
     def _validate_csrf(self) -> bool:
-        """Validate CSRF token for state-changing operations"""
         try:
             if request.path.startswith("/api/") and "Authorization" in request.headers:
                 return True
@@ -304,7 +289,6 @@ class SecurityMiddleware:
         event_data: Dict[str, Any],
         severity: AuditSeverity = AuditSeverity.LOW,
     ) -> Any:
-        """Log security event to audit service"""
         try:
             if self.audit_service:
                 self.audit_service.log_event(
@@ -320,7 +304,6 @@ class SecurityMiddleware:
             current_app.logger.error(f"Security event logging error: {e}")
 
     def _get_current_user_id(self) -> Optional[int]:
-        """Get current user ID if authenticated"""
         try:
             verify_jwt_in_request(optional=True)
             return get_jwt_identity()
@@ -328,7 +311,6 @@ class SecurityMiddleware:
             return None
 
     def _security_error(self, error: str, message: str, status_code: int) -> Any:
-        """Return security error response"""
         return (
             jsonify(
                 {
@@ -342,19 +324,16 @@ class SecurityMiddleware:
         )
 
     def request_entity_too_large(self, error: Any) -> Any:
-        """Handle request too large error"""
         return self._security_error(
             "Request too large", "Request size exceeds maximum allowed limit", 413
         )
 
     def rate_limit_exceeded(self, error: Any) -> Any:
-        """Handle rate limit exceeded error"""
         return self._security_error(
             "Rate limit exceeded", "Too many requests. Please try again later.", 429
         )
 
     def encrypt_sensitive_data(self, data: str) -> str:
-        """Encrypt sensitive data"""
         try:
             if isinstance(data, str):
                 data = data.encode()
@@ -364,7 +343,6 @@ class SecurityMiddleware:
             raise
 
     def decrypt_sensitive_data(self, encrypted_data: str) -> str:
-        """Decrypt sensitive data"""
         try:
             if isinstance(encrypted_data, str):
                 encrypted_data = encrypted_data.encode()
@@ -374,7 +352,6 @@ class SecurityMiddleware:
             raise
 
     def hash_password(self, password: str, salt: Optional[str] = None) -> tuple:
-        """Hash password with salt"""
         if salt is None:
             salt = os.urandom(32)
         elif isinstance(salt, str):
@@ -386,7 +363,6 @@ class SecurityMiddleware:
         return (key.decode(), base64.urlsafe_b64encode(salt).decode())
 
     def verify_password(self, password: str, hashed_password: str, salt: str) -> bool:
-        """Verify password against hash"""
         try:
             key, _ = self.hash_password(
                 password, base64.urlsafe_b64decode(salt.encode())
@@ -396,7 +372,6 @@ class SecurityMiddleware:
             return False
 
     def generate_csrf_token(self, session_id: str) -> str:
-        """Generate CSRF token for session"""
         token = base64.urlsafe_b64encode(os.urandom(32)).decode()
         if self.redis_client:
             self.redis_client.setex(f"csrf_token:{session_id}", 3600, token)
@@ -405,7 +380,6 @@ class SecurityMiddleware:
     def block_ip(
         self, ip_address: str, duration: int = 3600, reason: str = "Security violation"
     ) -> Any:
-        """Block IP address for specified duration"""
         try:
             if self.redis_client:
                 self.redis_client.setex(f"blocked_ip:{ip_address}", duration, reason)
@@ -419,7 +393,6 @@ class SecurityMiddleware:
 
 
 def require_api_key(f: Any) -> Any:
-    """Decorator to require API key authentication"""
 
     @wraps(f)
     def decorated_function(*args, **kwargs):
@@ -452,7 +425,6 @@ def require_api_key(f: Any) -> Any:
 
 
 def require_mfa(f: Any) -> Any:
-    """Decorator to require multi-factor authentication"""
 
     @wraps(f)
     def decorated_function(*args, **kwargs):
@@ -486,6 +458,5 @@ def require_mfa(f: Any) -> Any:
 
 
 def _validate_api_key(api_key: str) -> bool:
-    """Validate API key (implement your validation logic)"""
     valid_keys = os.environ.get("VALID_API_KEYS", "").split(",")
     return api_key in valid_keys
