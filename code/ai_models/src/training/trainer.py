@@ -9,10 +9,10 @@ from typing import Any, Callable, Dict, Tuple
 import joblib
 import numpy as np
 import pandas as pd
-from blockscore_ai.scoring.constants import FEATURE_COLUMNS
-from blockscore_ai.training.synthetic import TARGET_COLUMN
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from sklearn.model_selection import train_test_split
+from src.scoring.constants import FEATURE_COLUMNS
+from src.training.synthetic import TARGET_COLUMN
 from xgboost import XGBRegressor
 
 logger = logging.getLogger(__name__)

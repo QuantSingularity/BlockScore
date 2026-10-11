@@ -1,10 +1,10 @@
 import math
 from typing import Any, Dict, Iterable, List
 
-from blockscore_ai.scoring.constants import MAX_SCORE, MIN_SCORE
-from blockscore_ai.scoring.features import normalize_records, transform_blockchain_data
-from blockscore_ai.scoring.registry import ModelRegistry
-from blockscore_ai.scoring.rules import (
+from src.scoring.constants import MAX_SCORE, MIN_SCORE
+from src.scoring.features import normalize_records, transform_blockchain_data
+from src.scoring.registry import ModelRegistry
+from src.scoring.rules import (
     calculate_confidence,
     calculate_score_factors,
     empty_result,

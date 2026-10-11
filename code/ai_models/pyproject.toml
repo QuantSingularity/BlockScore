@@ -10,19 +10,19 @@ requires-python = ">=3.10"
 dynamic = ["version", "dependencies"]
 
 [project.scripts]
-blockscore-ai-train = "blockscore_ai.training.cli:main"
-blockscore-ai-serve = "blockscore_ai.__main__:main"
+blockscore-ai-train = "src.training.cli:main"
+blockscore-ai-serve = "src.__main__:main"
 
 [tool.setuptools.dynamic]
-version = { attr = "blockscore_ai.__version__" }
+version = { attr = "src.__version__" }
 dependencies = { file = ["requirements.txt"] }
 
 [tool.setuptools.packages.find]
-where = ["src"]
+include = ["src*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["src"]
+pythonpath = ["."]
 addopts = "-q"
 
 [tool.black]
@@ -31,4 +31,4 @@ target-version = ["py310"]
 
 [tool.isort]
 profile = "black"
-known_first_party = ["blockscore_ai"]
+known_first_party = ["src"]

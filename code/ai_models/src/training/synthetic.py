@@ -2,8 +2,8 @@ from typing import List, Tuple
 
 import numpy as np
 import pandas as pd
-from blockscore_ai.scoring.constants import FEATURE_COLUMNS, SECONDS_PER_DAY
-from blockscore_ai.scoring.features import transform_blockchain_data
+from src.scoring.constants import FEATURE_COLUMNS, SECONDS_PER_DAY
+from src.scoring.features import transform_blockchain_data
 
 BASE_TIMESTAMP = 1_700_000_000
 TARGET_COLUMN = "credit_score"

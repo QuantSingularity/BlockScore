@@ -1,7 +1,7 @@
 import pytest
-from blockscore_ai.config import Settings
-from blockscore_ai.scoring import ModelRegistry, ScoringService
-from blockscore_ai.training import (
+from src.config import Settings
+from src.scoring import ModelRegistry, ScoringService
+from src.training import (
     evaluate_model,
     generate_synthetic_data,
     save_model,

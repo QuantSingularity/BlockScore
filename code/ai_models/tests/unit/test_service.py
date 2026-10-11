@@ -1,5 +1,5 @@
 import pytest
-from blockscore_ai.scoring import (
+from src.scoring import (
     MAX_SCORE,
     MIN_SCORE,
     NEUTRAL_SCORE,

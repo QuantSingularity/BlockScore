@@ -2,10 +2,10 @@ import logging
 from datetime import datetime, timezone
 from typing import Any
 
-from blockscore_ai import __version__
-from blockscore_ai.api.errors import error_response
-from blockscore_ai.scoring import ScoringService, empty_result
 from flask import Blueprint, current_app, jsonify, request
+from src import __version__
+from src.api.errors import error_response
+from src.scoring import ScoringService, empty_result
 
 logger = logging.getLogger(__name__)
 

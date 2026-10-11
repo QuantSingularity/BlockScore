@@ -4,7 +4,7 @@ WORKDIR /app
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PYTHONPATH=/app/src \
+    PYTHONPATH=/app \
     PORT=5001
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -19,7 +19,7 @@ RUN pip install --no-cache-dir --upgrade pip && \
 COPY src ./src
 COPY wsgi.py ./
 
-RUN mkdir -p /app/artifacts && python -m blockscore_ai.training
+RUN mkdir -p /app/artifacts && python -m src.training
 
 RUN addgroup --system appgroup && \
     adduser --system --ingroup appgroup appuser && \

@@ -6,11 +6,11 @@ Credit scoring model, training pipeline, and HTTP service used by `code/backend`
 
 | Path                                                                    | Purpose                                                                    |
 | :---------------------------------------------------------------------- | :------------------------------------------------------------------------- |
-| `src/blockscore_ai/config.py`                                           | Environment driven settings                                                |
-| `src/blockscore_ai/api/`                                                | Flask app factory, routes, API key auth, JSON error handlers               |
-| `src/blockscore_ai/scoring/`                                            | Feature extraction, rules, model registry, scoring service                 |
-| `src/blockscore_ai/training/`                                           | Synthetic data, trainer, CLI, tabular preprocessing pipeline               |
-| `src/blockscore_ai/research/`                                           | Ensemble model with fairness and SHAP, portfolio and credit risk analytics |
+| `src/config.py`                                                         | Environment driven settings                                                |
+| `src/api/`                                                              | Flask app factory, routes, API key auth, JSON error handlers               |
+| `src/scoring/`                                                          | Feature extraction, rules, model registry, scoring service                 |
+| `src/training/`                                                         | Synthetic data, trainer, CLI, tabular preprocessing pipeline               |
+| `src/research/`                                                         | Ensemble model with fairness and SHAP, portfolio and credit risk analytics |
 | `tests/unit/`, `tests/api/`, `tests/training/`, `tests/research/`       | Test suites mirroring the package                                          |
 | `artifacts/`                                                            | Generated models, metadata, and reports (git ignored)                      |
 | `wsgi.py`                                                               | Production entry point (`wsgi:app`)                                        |

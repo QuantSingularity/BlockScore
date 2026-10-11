@@ -6,7 +6,7 @@ from typing import Any, Dict, Optional
 
 import joblib
 import pandas as pd
-from blockscore_ai.scoring.constants import FEATURE_COLUMNS
+from src.scoring.constants import FEATURE_COLUMNS
 
 logger = logging.getLogger(__name__)
 

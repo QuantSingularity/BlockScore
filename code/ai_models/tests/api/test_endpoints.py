@@ -1,8 +1,8 @@
 import json
 
 import pytest
-from blockscore_ai.api import create_app
-from blockscore_ai.config import Settings
+from src.api import create_app
+from src.config import Settings
 
 
 @pytest.fixture()

@@ -6,12 +6,12 @@ from typing import Any, List, Tuple
 import joblib
 import numpy as np
 import pandas as pd
-from blockscore_ai.config import ARTIFACTS_DIR
 from sklearn.compose import ColumnTransformer
 from sklearn.impute import SimpleImputer
 from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
+from src.config import ARTIFACTS_DIR
 
 FEATURE_SCHEMA = {
     "numerical": [

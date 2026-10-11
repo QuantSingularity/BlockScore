@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 import pytest
-from blockscore_ai.research.risk_analytics import RiskAnalytics
+from src.research.risk_analytics import RiskAnalytics
 
 
 @pytest.fixture()

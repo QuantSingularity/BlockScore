@@ -1,12 +1,12 @@
 import logging
 from typing import Optional
 
-from blockscore_ai.api.errors import register_error_handlers
-from blockscore_ai.api.routes import bp
-from blockscore_ai.api.security import register_auth
-from blockscore_ai.config import Settings, load_settings
-from blockscore_ai.scoring import ModelRegistry, ScoringService
 from flask import Flask
+from src.api.errors import register_error_handlers
+from src.api.routes import bp
+from src.api.security import register_auth
+from src.config import Settings, load_settings
+from src.scoring import ModelRegistry, ScoringService
 
 
 def create_app(

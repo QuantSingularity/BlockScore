@@ -1,5 +1,5 @@
-from blockscore_ai.api import create_app
-from blockscore_ai.config import load_settings
+from src.api import create_app
+from src.config import load_settings
 
 
 def main() -> None:

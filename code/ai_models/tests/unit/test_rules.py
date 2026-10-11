@@ -1,4 +1,4 @@
-from blockscore_ai.scoring import (
+from src.scoring import (
     NEUTRAL_SCORE,
     calculate_confidence,
     calculate_score_factors,

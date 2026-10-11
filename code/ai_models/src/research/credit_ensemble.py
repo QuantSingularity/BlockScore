@@ -9,7 +9,6 @@ import joblib
 import numpy as np
 import pandas as pd
 import xgboost as xgb
-from blockscore_ai.config import ARTIFACTS_DIR
 from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor
 from sklearn.feature_selection import SelectKBest, f_regression
 from sklearn.inspection import permutation_importance
@@ -17,6 +16,7 @@ from sklearn.linear_model import ElasticNet
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from sklearn.model_selection import GridSearchCV, train_test_split
 from sklearn.preprocessing import RobustScaler
+from src.config import ARTIFACTS_DIR
 
 try:
     import shap

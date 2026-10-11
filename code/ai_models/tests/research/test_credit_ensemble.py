@@ -1,8 +1,5 @@
 import pytest
-from blockscore_ai.research.credit_ensemble import (
-    AdvancedCreditScoringModel,
-    ModelConfig,
-)
+from src.research.credit_ensemble import AdvancedCreditScoringModel, ModelConfig
 
 
 @pytest.fixture(scope="module")

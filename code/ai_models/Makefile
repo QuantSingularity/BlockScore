@@ -13,10 +13,10 @@ install-research:
 	$(PYTHON) -m pip install -r requirements-research.txt
 
 train:
-	PYTHONPATH=src $(PYTHON) -m blockscore_ai.training
+	$(PYTHON) -m src.training
 
 serve:
-	PYTHONPATH=src $(PYTHON) -m blockscore_ai
+	$(PYTHON) -m src
 
 test:
 	$(PYTHON) -m pytest

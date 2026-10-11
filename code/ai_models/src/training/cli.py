@@ -3,19 +3,14 @@ import logging
 from pathlib import Path
 from typing import Optional, Sequence
 
-from blockscore_ai.config import load_settings
-from blockscore_ai.training.synthetic import generate_synthetic_data
-from blockscore_ai.training.trainer import (
-    evaluate_model,
-    save_model,
-    split_data,
-    train_model,
-)
+from src.config import load_settings
+from src.training.synthetic import generate_synthetic_data
+from src.training.trainer import evaluate_model, save_model, split_data, train_model
 
 
 def main(argv: Optional[Sequence[str]] = None) -> None:
     settings = load_settings()
-    parser = argparse.ArgumentParser(prog="blockscore_ai.training")
+    parser = argparse.ArgumentParser(prog="src.training")
     parser.add_argument("--samples", type=int, default=6000)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--output", type=Path, default=settings.model_path)

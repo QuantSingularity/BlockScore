@@ -1,5 +1,5 @@
-from blockscore_ai.training.synthetic import TARGET_COLUMN, generate_synthetic_data
-from blockscore_ai.training.trainer import (
+from src.training.synthetic import TARGET_COLUMN, generate_synthetic_data
+from src.training.trainer import (
     MODEL_NAME,
     evaluate_model,
     save_model,

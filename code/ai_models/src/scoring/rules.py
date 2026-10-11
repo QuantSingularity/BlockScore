@@ -1,6 +1,6 @@
 from typing import Any, Dict, List
 
-from blockscore_ai.scoring.constants import NEUTRAL_SCORE
+from src.scoring.constants import NEUTRAL_SCORE
 
 
 def rule_based_score(features: Dict[str, float]) -> float:

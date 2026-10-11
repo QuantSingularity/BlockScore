@@ -2,7 +2,7 @@ import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
 ARTIFACTS_DIR = PROJECT_ROOT / "artifacts"
 DEFAULT_MODEL_FILENAME = "credit_scoring_model.pkl"
 

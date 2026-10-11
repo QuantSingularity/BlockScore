@@ -1,10 +1,6 @@
 import numpy as np
 import pytest
-from blockscore_ai.scoring import (
-    FEATURE_COLUMNS,
-    normalize_records,
-    transform_blockchain_data,
-)
+from src.scoring import FEATURE_COLUMNS, normalize_records, transform_blockchain_data
 
 
 def test_normalize_records_drops_invalid_entries(good_history):

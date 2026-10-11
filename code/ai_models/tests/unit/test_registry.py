@@ -1,11 +1,7 @@
 import json
 import shutil
 
-from blockscore_ai.scoring import (
-    FEATURE_COLUMNS,
-    ModelRegistry,
-    transform_blockchain_data,
-)
+from src.scoring import FEATURE_COLUMNS, ModelRegistry, transform_blockchain_data
 
 
 def test_loads_model_and_metadata(registry):

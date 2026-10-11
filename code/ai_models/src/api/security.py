@@ -1,8 +1,8 @@
 import hmac
 from typing import Any, Optional, Tuple
 
-from blockscore_ai.api.errors import error_response
 from flask import Flask, request
+from src.api.errors import error_response
 
 PUBLIC_ENDPOINTS = frozenset({"scoring.health_check"})
 

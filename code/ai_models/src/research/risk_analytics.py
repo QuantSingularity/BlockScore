@@ -8,8 +8,8 @@ from typing import Any, Dict, List
 import numpy as np
 import pandas as pd
 import scipy.stats as stats
-from blockscore_ai.config import ARTIFACTS_DIR
 from scipy.stats import norm
+from src.config import ARTIFACTS_DIR
 
 logger = logging.getLogger(__name__)
 

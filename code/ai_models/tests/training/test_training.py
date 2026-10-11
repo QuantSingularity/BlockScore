@@ -2,9 +2,9 @@ import json
 
 import joblib
 import numpy as np
-from blockscore_ai.scoring import FEATURE_COLUMNS
-from blockscore_ai.training import MODEL_NAME, TARGET_COLUMN, generate_synthetic_data
-from blockscore_ai.training.cli import main
+from src.scoring import FEATURE_COLUMNS
+from src.training import MODEL_NAME, TARGET_COLUMN, generate_synthetic_data
+from src.training.cli import main
 
 
 def test_synthetic_data_schema_and_range():

@@ -1,7 +1,7 @@
 from typing import Any, Dict, List, Optional
 
 import numpy as np
-from blockscore_ai.scoring.constants import (
+from src.scoring.constants import (
     MAX_RECORDS,
     REPAYABLE_TYPES,
     SECONDS_PER_DAY,
