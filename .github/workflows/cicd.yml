@@ -107,7 +107,7 @@ jobs:
           retention-days: 30
 
   # ============================================================
-  # Job 3 -- Backend Docker Build & Smoke Test
+  # Job 3 -- Backend Build & Smoke Test
   # ============================================================
   backend_build:
     name: Backend Build
@@ -235,8 +235,8 @@ jobs:
   # ============================================================
   # Job 5 -- Web Frontend Build
   # ============================================================
-  frontend_build:
-    name: Frontend Build
+  web_frontend_build:
+    name: Web Frontend Build
     runs-on: ubuntu-latest
     needs: code_quality
 
