@@ -6,6 +6,7 @@
     "android": "react-native run-android",
     "ios": "react-native run-ios",
     "lint": "eslint .",
+    "build:web": "expo export --platform web",
     "start": "react-native start",
     "test": "jest",
     "test:ci": "jest --coverage --watchAll=false --forceExit --ci",
