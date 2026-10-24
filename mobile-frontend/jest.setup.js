@@ -13,6 +13,12 @@ jest.mock("react-native-vector-icons/MaterialIcons", () => ({
   default: "Icon",
 }));
 
+jest.mock("react-native-chart-kit", () => ({
+  LineChart: "LineChart",
+  BarChart: "BarChart",
+  PieChart: "PieChart",
+}));
+
 // Suppress console warnings during tests
 global.console = {
   ...console,
