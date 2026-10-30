@@ -8,8 +8,8 @@ spec:
     apiVersion: apps/v1
     kind: Deployment
     name: "{{ .Values.appName }}-backend"
-  minReplicas: {{ .Values.backend.replicas }}
-  maxReplicas: {{ mul .Values.backend.replicas 3 }}
+  minReplicas: { { .Values.backend.replicas } }
+  maxReplicas: { { mul .Values.backend.replicas 3 } }
   metrics:
     - type: Resource
       resource:
@@ -46,8 +46,8 @@ spec:
     apiVersion: apps/v1
     kind: Deployment
     name: "{{ .Values.appName }}-frontend"
-  minReplicas: {{ .Values.frontend.replicas }}
-  maxReplicas: {{ mul .Values.frontend.replicas 3 }}
+  minReplicas: { { .Values.frontend.replicas } }
+  maxReplicas: { { mul .Values.frontend.replicas 3 } }
   metrics:
     - type: Resource
       resource:
