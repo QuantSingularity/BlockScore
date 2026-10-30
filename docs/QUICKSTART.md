@@ -77,8 +77,8 @@ npm start
 
 Open your browser and navigate to:
 
-- **Web Frontend**: http://localhost:3000
-- **Backend API**: http://localhost:5000/api/health
+- **Web Frontend**: <http://localhost:3000>
+- **Backend API**: <http://localhost:5000/api/health>
 
 You should see:
 
@@ -137,7 +137,7 @@ curl -X POST http://localhost:5000/api/credit/calculate-score \
 
 ### 3. Explore the Dashboard
 
-Visit http://localhost:3000 and:
+Visit <http://localhost:3000> and:
 
 1. Register a new account
 2. Connect your wallet (MetaMask recommended)
@@ -197,14 +197,14 @@ cd web-frontend && npm start
 
 ## 📚 What's Next?
 
-- **Read the [Usage Guide](USAGE.md)** - Learn common workflows
+- **Read the [Usage Guide](usage.md)** - Learn common workflows
 - **Explore [API Documentation](API.md)** - Integrate with your applications
 - **Review [Configuration Guide](CONFIGURATION.md)** - Advanced configuration options
 - **Check [Examples](examples/)** - Working code samples
 
 ## 🐛 Still Having Issues?
 
-1. Check [Troubleshooting Guide](TROUBLESHOOTING.md)
+1. Check [Troubleshooting Guide](troubleshooting.md)
 2. Review logs in `code/backend/` directory
 3. Open an issue on [GitHub](https://github.com/quantsingularity/BlockScore/issues)
 

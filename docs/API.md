@@ -574,7 +574,7 @@ All errors follow this format:
 
 Every API response includes rate limit information:
 
-```
+```text
 X-RateLimit-Limit: 100
 X-RateLimit-Remaining: 95
 X-RateLimit-Reset: 1704034200
@@ -682,10 +682,10 @@ curl -X POST http://localhost:5000/api/credit/calculate-score \
 
 ## Next Steps
 
-- [Usage Guide](USAGE.md) - Common usage patterns
+- [Usage Guide](usage.md) - Common usage patterns
 - [Examples](examples/) - Complete working examples
 - [Configuration](CONFIGURATION.md) - API configuration options
 
 ---
 
-**Need Help?** Check the [Troubleshooting Guide](TROUBLESHOOTING.md) or [GitHub Issues](https://github.com/quantsingularity/BlockScore/issues).
+**Need Help?** Check the [Troubleshooting Guide](troubleshooting.md) or [GitHub Issues](https://github.com/quantsingularity/BlockScore/issues).

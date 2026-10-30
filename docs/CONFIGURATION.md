@@ -382,7 +382,7 @@ LOG_LEVEL=DEBUG
 
 ### Staging Environment
 
-```bash
+```ini
 # code/backend/.env
 FLASK_ENV=production
 DEBUG=False
@@ -396,7 +396,7 @@ LOG_LEVEL=INFO
 
 ### Production Environment
 
-```bash
+```ini
 # code/backend/.env
 FLASK_ENV=production
 DEBUG=False
@@ -478,9 +478,9 @@ redis-cli -u $REDIS_URL ping
 ## Next Steps
 
 - [API Reference](API.md) - Explore available endpoints
-- [Deployment Guide](DEPLOYMENT.md) - Deploy to production
+- [Deployment Guide](deployment.md) - Deploy to production
 - [Security Guide](SECURITY.md) - Security best practices
 
 ---
 
-**Need Help?** Check the [Troubleshooting Guide](TROUBLESHOOTING.md) for common configuration issues.
+**Need Help?** Check the [Troubleshooting Guide](troubleshooting.md) for common configuration issues.

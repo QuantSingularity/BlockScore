@@ -14,8 +14,8 @@ Complete feature list with implementation details and examples.
 | Loan Calculator          | Calculate loan terms      | `code/backend/app.py`                        | `POST /api/loans/calculate`        | [examples/loan_application.md](examples/loan_application.md) | No auth required                |
 | Smart Contract - Credit  | On-chain credit records   | `code/blockchain/contracts/CreditScore.sol`  | Contract methods                   | [SMART_CONTRACTS.md](SMART_CONTRACTS.md)                     | Solidity 0.8.0                  |
 | Smart Contract - Loans   | On-chain loan management  | `code/blockchain/contracts/LoanContract.sol` | Contract methods                   | [SMART_CONTRACTS.md](SMART_CONTRACTS.md)                     | Automated repayment             |
-| Web Dashboard            | React-based UI            | `web-frontend/`                              | `npm start`                        | [USAGE.md#web-interface](USAGE.md)                           | Material-UI components          |
-| Mobile App               | React Native app          | `mobile-frontend/`                           | `npm start`                        | [USAGE.md#mobile-app](USAGE.md)                              | iOS & Android                   |
+| Web Dashboard            | React-based UI            | `web-frontend/`                              | `npm start`                        | [USAGE.md#web-interface](usage.md)                           | Material-UI components          |
+| Mobile App               | React Native app          | `mobile-frontend/`                           | `npm start`                        | [USAGE.md#mobile-app](usage.md)                              | iOS & Android                   |
 | Health Monitoring        | System status checks      | `code/backend/app.py`                        | `GET /api/health`                  | [API.md#health-check](API.md)                                | No auth required                |
 | MFA Authentication       | Two-factor authentication | `code/backend/services/mfa_service.py`       | API integration                    | [SECURITY.md#mfa](SECURITY.md)                               | TOTP-based                      |
 | Audit Logging            | Security event tracking   | `code/backend/services/audit_service.py`     | Automatic                          | N/A                                                          | 10-year retention               |
@@ -38,7 +38,7 @@ Complete feature list with implementation details and examples.
 | --------------------- | ---------------------- | -------------------------------------------------- | ------------------------------- | ---------------------------------------- | --------------------------------- |
 | Ethereum Integration  | Connect to Ethereum    | `code/backend/services/blockchain_service.py`      | Web3.py                         | [SMART_CONTRACTS.md](SMART_CONTRACTS.md) | Supports a local Hardhat node     |
 | Polygon Integration   | Polygon support        | `code/backend/services/blockchain_service.py`      | Web3.py                         | [SMART_CONTRACTS.md](SMART_CONTRACTS.md) | Lower gas fees                    |
-| Wallet Connect        | MetaMask integration   | `web-frontend/src/`                                | Web3                            | [USAGE.md#wallet](USAGE.md)              | Browser extension                 |
+| Wallet Connect        | MetaMask integration   | `web-frontend/src/`                                | Web3                            | [USAGE.md#wallet](usage.md)              | Browser extension                 |
 | Contract Deployment   | Deploy smart contracts | `code/blockchain/`                                 | `hardhat run scripts/deploy.js` | [CLI.md#deploy](CLI.md)                  | Requires network config           |
 | On-Chain Verification | Verify credit data     | `CreditScoreV2.addCreditRecord` (`dataHash` param) | `getCreditHistory()`            | [SMART_CONTRACTS.md](SMART_CONTRACTS.md) | Off-chain data integrity via hash |
 | Governance Token      | DAO governance         | `code/blockchain/contracts/GovernanceToken.sol`    | ERC20                           | [SMART_CONTRACTS.md](SMART_CONTRACTS.md) | Platform governance               |
@@ -59,12 +59,12 @@ Complete feature list with implementation details and examples.
 
 | Feature             | Short description      | Module / File                | CLI flag / API      | Example (path)                            | Notes                |
 | ------------------- | ---------------------- | ---------------------------- | ------------------- | ----------------------------------------- | -------------------- |
-| Docker Support      | Containerization       | `Dockerfile` (planned)       | `docker-compose up` | [DEPLOYMENT.md#docker](DEPLOYMENT.md)     | Coming soon          |
-| Ansible Automation  | Infrastructure as Code | `infrastructure/ansible/`    | `ansible-playbook`  | [DEPLOYMENT.md#ansible](DEPLOYMENT.md)    | Role-based           |
+| Docker Support      | Containerization       | `Dockerfile` (planned)       | `docker-compose up` | [DEPLOYMENT.md#docker](deployment.md)     | Coming soon          |
+| Ansible Automation  | Infrastructure as Code | `infrastructure/ansible/`    | `ansible-playbook`  | [DEPLOYMENT.md#ansible](deployment.md)    | Role-based           |
 | CI/CD Pipeline      | GitHub Actions         | `.github/workflows/cicd.yml` | Automatic           | N/A                                       | Test + Deploy        |
-| Monitoring          | Prometheus/Grafana     | `infrastructure/`            | Metrics API         | [DEPLOYMENT.md#monitoring](DEPLOYMENT.md) | Performance tracking |
+| Monitoring          | Prometheus/Grafana     | `infrastructure/`            | Metrics API         | [DEPLOYMENT.md#monitoring](deployment.md) | Performance tracking |
 | Database Migrations | Schema versioning      | Alembic                      | `alembic upgrade`   | [CLI.md#migrations](CLI.md)               | Version controlled   |
-| Backup Automation   | Scheduled backups      | Ansible scripts              | Cron jobs           | [DEPLOYMENT.md#backup](DEPLOYMENT.md)     | Daily backups        |
+| Backup Automation   | Scheduled backups      | Ansible scripts              | Cron jobs           | [DEPLOYMENT.md#backup](deployment.md)     | Daily backups        |
 
 ## Development Tools
 

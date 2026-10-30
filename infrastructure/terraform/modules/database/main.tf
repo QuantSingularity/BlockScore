@@ -68,9 +68,9 @@ resource "aws_db_instance" "main" {
   monitoring_interval             = 60
   monitoring_role_arn             = var.monitoring_role_arn
 
-  multi_az               = var.environment == "prod" ? true : false
+  multi_az                   = var.environment == "prod" ? true : false
   auto_minor_version_upgrade = true
-  deletion_protection    = var.environment == "prod" ? true : false
+  deletion_protection        = var.environment == "prod" ? true : false
 
   performance_insights_enabled          = true
   performance_insights_retention_period = var.environment == "prod" ? 731 : 7

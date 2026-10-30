@@ -55,7 +55,7 @@ terraform_security_scan() {
         checkov -d infrastructure/terraform/ --framework terraform --output cli --output json --output-file-path reports/terraform-security-scan.json
     else
         print_warning "Checkov not installed, running with Docker..."
-        docker run --rm -v $(pwd):/tf bridgecrew/checkov -d /tf/infrastructure/terraform/ --framework terraform --output cli --output json --output-file-path /tf/reports/terraform-security-scan.json
+        docker run --rm -v "$(pwd)":/tf bridgecrew/checkov -d /tf/infrastructure/terraform/ --framework terraform --output cli --output json --output-file-path /tf/reports/terraform-security-scan.json
     fi
 
     print_status "Terraform security scan completed"

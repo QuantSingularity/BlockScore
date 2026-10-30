@@ -152,7 +152,7 @@ Add a matching entry to `code/blockchain/hardhat.config.js`'s `networks` block (
 ```bash
 cd code/blockchain
 LENDING_TOKEN_ADDRESS=0x... TREASURY_ADDRESS=0x... \
-  npx hardhat run scripts/deploy.js --network <network-name>
+  npx hardhat run scripts/deploy.js --network "<network-name>"
 ```
 
 `scripts/deploy.js` writes `deployments/<network>/addresses.json` and `deployments/<network>/constructor-args.json` (the latter needed to verify source via `npx hardhat verify --network <network> <address> <constructor-args...>`, bundled as `@nomicfoundation/hardhat-verify` in `@nomicfoundation/hardhat-toolbox`).

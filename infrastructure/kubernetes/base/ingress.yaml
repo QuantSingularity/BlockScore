@@ -29,11 +29,11 @@ spec:
               service:
                 name: "{{ .Values.appName }}-backend"
                 port:
-                  number: { { .Values.backend.servicePort } }
+                  number: {{ .Values.backend.servicePort }}
           - path: /
             pathType: Prefix
             backend:
               service:
                 name: "{{ .Values.appName }}-frontend"
                 port:
-                  number: { { .Values.frontend.servicePort } }
+                  number: {{ .Values.frontend.servicePort }}

@@ -12,28 +12,30 @@ Welcome to the comprehensive documentation for BlockScore, a blockchain-based cr
 
 ### Usage & Development
 
-- [Usage Guide](USAGE.md) - Common usage patterns and workflows
+- [Usage Guide](usage.md) - Common usage patterns and workflows
 - [CLI Reference](CLI.md) - Command-line interface documentation
 - [API Reference](API.md) - Complete REST API documentation
 
 ### Architecture & Design
 
-- [Architecture Overview](ARCHITECTURE.md) - System design and component interaction
+- [Architecture Overview](architecture.md) - System design and component interaction
 - [Smart Contracts](SMART_CONTRACTS.md) - Blockchain contract documentation
 - [Feature Matrix](FEATURE_MATRIX.md) - Complete feature list with examples
 
 ### Advanced Topics
 
-- [Migration Guide](MIGRATIONS.md) - Upgrading between versions
-- [Deployment Guide](DEPLOYMENT.md) - Production deployment strategies
+- [Deployment Guide](deployment.md) - Production deployment strategies
 - [Security Guide](SECURITY.md) - Security best practices and considerations
 
 ### Reference
 
 - [Examples](examples/) - Working code examples and tutorials
-- [Troubleshooting](TROUBLESHOOTING.md) - Common issues and solutions
+  - [Authentication](examples/auth_example.md) - Register, log in and use JWT tokens
+  - [Credit Scoring](examples/credit_scoring.md) - Request and read credit scores
+  - [Loan Applications](examples/loan_application.md) - Submit and track a loan application
+  - [AI Integration](examples/ai_integration.md) - Call the AI scoring service
+- [Troubleshooting](troubleshooting.md) - Common issues and solutions
 - [Contributing](CONTRIBUTING.md) - How to contribute to BlockScore
-- [API Examples](api/) - API usage examples and patterns
 
 ## 🚀 Quick Navigation
 
@@ -41,18 +43,18 @@ Welcome to the comprehensive documentation for BlockScore, a blockchain-based cr
 
 1. Start with [Installation Guide](INSTALLATION.md)
 2. Follow the [Quick Start Guide](QUICKSTART.md)
-3. Review [Usage Guide](USAGE.md) for common tasks
+3. Review [Usage Guide](usage.md) for common tasks
 
 ### For Developers
 
-1. Read [Architecture Overview](ARCHITECTURE.md)
+1. Read [Architecture Overview](architecture.md)
 2. Explore [API Reference](API.md)
 3. Check [Examples](examples/) for code samples
 4. Review [Contributing Guide](CONTRIBUTING.md)
 
 ### For DevOps/Administrators
 
-1. Review [Deployment Guide](DEPLOYMENT.md)
+1. Review [Deployment Guide](deployment.md)
 2. Configure using [Configuration Guide](CONFIGURATION.md)
 3. Check [Security Guide](SECURITY.md)
 
@@ -81,4 +83,4 @@ BlockScore is a production-ready platform that revolutionizes credit scoring by:
 
 ---
 
-**Need Help?** Check the [Troubleshooting Guide](TROUBLESHOOTING.md) or open an issue on GitHub.
+**Need Help?** Check the [Troubleshooting Guide](troubleshooting.md) or open an issue on GitHub.

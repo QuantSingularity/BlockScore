@@ -16,49 +16,49 @@
 
 1. Install dependencies:
 
-```bash
-sudo apt update
-sudo apt install python3 python3-pip nodejs npm postgresql redis-server nginx
-```
+   ```bash
+   sudo apt update
+   sudo apt install python3 python3-pip nodejs npm postgresql redis-server nginx
+   ```
 
 2. Clone and setup:
 
-```bash
-git clone https://github.com/quantsingularity/BlockScore.git
-cd BlockScore
-./scripts/setup_blockscore_env.sh
-```
+   ```bash
+   git clone https://github.com/quantsingularity/BlockScore.git
+   cd BlockScore
+   ./scripts/setup_blockscore_env.sh
+   ```
 
 3. Configure environment:
 
-```bash
-cd code/backend
-cp .env.example .env
-# Edit .env with production values
-```
+   ```bash
+   cd code/backend
+   cp .env.example .env
+   # Edit .env with production values
+   ```
 
 4. Start with Gunicorn:
 
-```bash
-cd code/backend
-source venv/bin/activate
-gunicorn -w 4 -b 0.0.0.0:5000 app:app
-```
+   ```bash
+   cd code/backend
+   source venv/bin/activate
+   gunicorn -w 4 -b 0.0.0.0:5000 app:app
+   ```
 
 5. Configure Nginx:
 
-```nginx
-server {
-    listen 80;
-    server_name api.blockscore.io;
+   ```nginx
+   server {
+       listen 80;
+       server_name api.blockscore.io;
 
-    location / {
-        proxy_pass http://127.0.0.1:5000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-    }
-}
-```
+       location / {
+           proxy_pass http://127.0.0.1:5000;
+           proxy_set_header Host $host;
+           proxy_set_header X-Real-IP $remote_addr;
+       }
+   }
+   ```
 
 ### 2. Docker Deployment (Coming Soon)
 

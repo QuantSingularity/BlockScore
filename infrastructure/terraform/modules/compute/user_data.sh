@@ -1,4 +1,6 @@
 #!/bin/bash
+# Variables below (project_name, environment, ...) are injected by Terraform templatefile().
+# shellcheck disable=SC2154
 set -euo pipefail
 
 exec > >(tee /var/log/user-data.log | logger -t user-data) 2>&1

@@ -51,6 +51,18 @@ Start all BlockScore services.
 - Web Frontend (Port 3000)
 - AI Model Server (if configured)
 
+### unified_env_setup.sh
+
+Full development environment setup: OS packages, Python (backend and AI models), Node.js (web and mobile frontends) and the Hardhat toolchain.
+
+**Location**: `scripts/unified_env_setup.sh`
+
+**Usage**:
+
+```bash
+./scripts/unified_env_setup.sh
+```
+
 ## Deployment Scripts
 
 ### smart_contract_deploy.sh
@@ -147,6 +159,33 @@ Run linters on entire codebase.
 
 # Auto-fix issues
 ./scripts/lint-all.sh --fix
+```
+
+### multi_component_build.sh
+
+Build one or more components, sequentially or in parallel.
+
+**Location**: `scripts/multi_component_build.sh`
+
+**Usage**:
+
+```bash
+./scripts/multi_component_build.sh [options] [components]
+```
+
+**Flags**:
+
+- `-h`, `--help`: Show usage
+- `-p`, `--parallel`: Build components in parallel
+- `-c`, `--clean`: Clean build (remove `node_modules`, etc.)
+
+**Components**: `all` (default), `blockchain`, `backend`, `frontend`, `mobile`, `ai`
+
+**Example**:
+
+```bash
+# Build the frontend and backend in parallel
+./scripts/multi_component_build.sh -p frontend backend
 ```
 
 ### code_quality_check.sh
@@ -364,10 +403,12 @@ make serve
 | Command                         | Arguments           | Description                                | Example                                              |
 | ------------------------------- | ------------------- | ------------------------------------------ | ---------------------------------------------------- |
 | `setup_blockscore_env.sh`       | None                | Setup development environment              | `./scripts/setup_blockscore_env.sh`                  |
+| `unified_env_setup.sh`          | None                | Full development environment setup         | `./scripts/unified_env_setup.sh`                     |
 | `run_blockscore.sh`             | None                | Start all services                         | `./scripts/run_blockscore.sh`                        |
 | `smart_contract_deploy.sh`      | `-n [network] [-v]` | Deploy smart contracts                     | `./scripts/smart_contract_deploy.sh -n test`         |
 | `component_restart.sh`          | `[component]`       | Restart specific component                 | `./scripts/component_restart.sh backend`             |
 | `lint-all.sh`                   | `[--fix]`           | Run code linters                           | `./scripts/lint-all.sh --fix`                        |
+| `multi_component_build.sh`      | `[-p] [-c] [names]` | Build components                           | `./scripts/multi_component_build.sh -p backend`      |
 | `code_quality_check.sh`         | None                | Run quality checks                         | `./scripts/code_quality_check.sh`                    |
 | `hardhat compile`               | None                | Compile Solidity contracts                 | `cd code/blockchain && npm run compile`              |
 | `hardhat test`                  | None                | Run contract tests                         | `cd code/blockchain && npm test`                     |
@@ -434,8 +475,8 @@ cat code/blockchain/deployment.log
 
 - [API Reference](API.md) - Explore API endpoints
 - [Configuration](CONFIGURATION.md) - Configure services
-- [Troubleshooting](TROUBLESHOOTING.md) - Common issues
+- [Troubleshooting](troubleshooting.md) - Common issues
 
 ---
 
-**Need Help?** Check the [Troubleshooting Guide](TROUBLESHOOTING.md) or [GitHub Issues](https://github.com/quantsingularity/BlockScore/issues).
+**Need Help?** Check the [Troubleshooting Guide](troubleshooting.md) or [GitHub Issues](https://github.com/quantsingularity/BlockScore/issues).

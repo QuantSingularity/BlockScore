@@ -8,8 +8,8 @@ metadata:
 spec:
   type: "{{ .Values.frontend.service.type }}"
   ports:
-    - port: { { .Values.frontend.servicePort } }
-      targetPort: { { .Values.frontend.containerPort } }
+    - port: {{ .Values.frontend.servicePort }}
+      targetPort: {{ .Values.frontend.containerPort }}
       protocol: TCP
       name: http
   selector:

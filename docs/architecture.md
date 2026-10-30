@@ -4,7 +4,7 @@
 
 BlockScore follows a modular microservices architecture combining blockchain, AI, and traditional web technologies.
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────┐
 │                         FRONTEND LAYER                       │
 │  ┌──────────────────┐           ┌──────────────────┐       │
@@ -85,7 +85,7 @@ BlockScore follows a modular microservices architecture combining blockchain, AI
 
 ### Credit Score Calculation
 
-```
+```text
 User Request → API Authentication → Fetch Blockchain Data
                                            ↓
                               AI Model Preprocessing
@@ -99,7 +99,7 @@ User Request → API Authentication → Fetch Blockchain Data
 
 ### Loan Application
 
-```
+```text
 User Submits → API Validation → Check Credit Score
                                        ↓
                               Calculate Approval Probability
@@ -125,7 +125,7 @@ User Submits → API Validation → Check Credit Score
 
 ## Deployment Architecture
 
-```
+```text
 ┌──────────────────────────────────────────────────────┐
 │                    Load Balancer                      │
 │                    (Nginx/ALB)                        │

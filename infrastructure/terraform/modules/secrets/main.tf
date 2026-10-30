@@ -1,7 +1,7 @@
 resource "aws_secretsmanager_secret" "db_credentials" {
   name_prefix = "${var.project_name}-${var.environment}-db-"
   description = "Database credentials for ${var.project_name} ${var.environment}"
-  
+
   recovery_window_in_days = var.environment == "prod" ? 30 : 7
 
   tags = {
@@ -23,7 +23,7 @@ resource "aws_secretsmanager_secret_version" "db_credentials" {
 resource "aws_secretsmanager_secret" "api_keys" {
   name_prefix = "${var.project_name}-${var.environment}-api-"
   description = "API keys for ${var.project_name} ${var.environment}"
-  
+
   recovery_window_in_days = var.environment == "prod" ? 30 : 7
 
   tags = {

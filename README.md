@@ -32,7 +32,7 @@ BlockScore demonstrates a credit-scoring workflow across a real, runnable codeba
 
 ## Project Structure
 
-```
+```text
 BlockScore/
 ├── code/
 │   ├── backend/                # Flask application (the live backend)
@@ -88,7 +88,7 @@ BlockScore/
 
 ## Architecture
 
-```
+```text
 Clients
   ├── web-frontend (React)               ── HTTP/JSON ──┐
   └── mobile-frontend (React Native)     ── HTTP/JSON ──┤

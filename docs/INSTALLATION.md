@@ -207,20 +207,20 @@ python3 --version && node --version && mongod --version
 
 ### Windows (WSL2 Recommended)
 
-**Option A: WSL2 (Recommended)**
+#### Option A: WSL2 (Recommended)
 
 1. Enable WSL2:
 
-```powershell
-# Run in PowerShell as Administrator
-wsl --install
-wsl --set-default-version 2
-```
+   ```powershell
+   # Run in PowerShell as Administrator
+   wsl --install
+   wsl --set-default-version 2
+   ```
 
 2. Install Ubuntu from Microsoft Store
 3. Follow Ubuntu instructions above inside WSL2
 
-**Option B: Native Windows**
+#### Option B: Native Windows
 
 | Component   | Installation Method                                                         | Notes                   |
 | ----------- | --------------------------------------------------------------------------- | ----------------------- |
@@ -318,12 +318,14 @@ curl http://localhost:5000/api/health
   "version": "1.0.0",
   "services": {
     "database": "up",
-    "redis": "up" or "not_configured",
-    "blockchain": "up" or "down",
+    "redis": "up",
+    "blockchain": "up",
     "ai_model": "up"
   }
 }
 ```
+
+`redis` can also report `not_configured`, and `blockchain` can report `down`.
 
 ### Run Test Suite
 
@@ -443,12 +445,12 @@ brew services start mongodb-community  # macOS
 
 1. [Quick Start Guide](QUICKSTART.md) - Get up and running
 2. [Configuration Guide](CONFIGURATION.md) - Advanced configuration
-3. [Usage Guide](USAGE.md) - Learn how to use BlockScore
+3. [Usage Guide](usage.md) - Learn how to use BlockScore
 
 ## Additional Resources
 
 - [Official Repository](https://github.com/quantsingularity/BlockScore)
-- [Troubleshooting Guide](TROUBLESHOOTING.md)
-- [Architecture Overview](ARCHITECTURE.md)
+- [Troubleshooting Guide](troubleshooting.md)
+- [Architecture Overview](architecture.md)
 
 ---
