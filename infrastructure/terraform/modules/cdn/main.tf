@@ -11,19 +11,7 @@ resource "aws_cloudfront_distribution" "main" {
     domain_name = var.origin_domain_name
     origin_id   = "${var.project_name}-${var.environment}-origin"
 
-    dynamic "s3_origin_config" {
-      for_each = var.origin_type == "s3" ? [1] : []
-      content {
-        origin_access_identity = ""
-      }
-    }
-
-    dynamic "origin_access_control_id" {
-      for_each = var.origin_type == "s3" ? [1] : []
-      content {
-        value = aws_cloudfront_origin_access_control.main.id
-      }
-    }
+    origin_access_control_id = var.origin_type == "s3" ? aws_cloudfront_origin_access_control.main.id : null
 
     dynamic "custom_origin_config" {
       for_each = var.origin_type == "custom" ? [1] : []
