@@ -8,8 +8,10 @@ metadata:
 spec:
   type: ClusterIP
   ports:
-    - port: { { .Values.backend.servicePort } }
-      targetPort: { { .Values.backend.containerPort } }
+    # prettier-ignore
+    - port: {{ .Values.backend.servicePort }}
+      # prettier-ignore
+      targetPort: {{ .Values.backend.containerPort }}
       protocol: TCP
       name: http
   selector:

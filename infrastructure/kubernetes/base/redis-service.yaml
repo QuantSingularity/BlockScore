@@ -8,8 +8,10 @@ metadata:
 spec:
   type: ClusterIP
   ports:
-    - port: { { .Values.redis.servicePort } }
-      targetPort: { { .Values.redis.containerPort } }
+    # prettier-ignore
+    - port: {{ .Values.redis.servicePort }}
+      # prettier-ignore
+      targetPort: {{ .Values.redis.containerPort }}
       protocol: TCP
       name: redis
   selector:

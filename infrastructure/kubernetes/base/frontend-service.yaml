@@ -8,8 +8,10 @@ metadata:
 spec:
   type: "{{ .Values.frontend.service.type }}"
   ports:
-    - port: { { .Values.frontend.servicePort } }
-      targetPort: { { .Values.frontend.containerPort } }
+    # prettier-ignore
+    - port: {{ .Values.frontend.servicePort }}
+      # prettier-ignore
+      targetPort: {{ .Values.frontend.containerPort }}
       protocol: TCP
       name: http
   selector:

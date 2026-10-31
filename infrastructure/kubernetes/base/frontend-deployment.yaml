@@ -6,7 +6,8 @@ metadata:
   labels:
     app: "{{ .Values.appName }}-frontend"
 spec:
-  replicas: { { .Values.frontend.replicas } }
+  # prettier-ignore
+  replicas: {{ .Values.frontend.replicas }}
   selector:
     matchLabels:
       app: "{{ .Values.appName }}-frontend"
@@ -26,7 +27,8 @@ spec:
           image: "{{ .Values.frontend.image.repository }}:{{ .Values.frontend.image.tag }}"
           imagePullPolicy: "{{ .Values.frontend.image.pullPolicy }}"
           ports:
-            - containerPort: { { .Values.frontend.containerPort } }
+            # prettier-ignore
+            - containerPort: {{ .Values.frontend.containerPort }}
               name: http
           resources:
             limits:

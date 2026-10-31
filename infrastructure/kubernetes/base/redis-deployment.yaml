@@ -6,7 +6,8 @@ metadata:
   labels:
     app: "{{ .Values.appName }}-redis"
 spec:
-  replicas: { { .Values.redis.replicas } }
+  # prettier-ignore
+  replicas: {{ .Values.redis.replicas }}
   selector:
     matchLabels:
       app: "{{ .Values.appName }}-redis"
@@ -24,7 +25,8 @@ spec:
           image: "{{ .Values.redis.image.repository }}:{{ .Values.redis.image.tag }}"
           imagePullPolicy: "{{ .Values.redis.image.pullPolicy }}"
           ports:
-            - containerPort: { { .Values.redis.containerPort } }
+            # prettier-ignore
+            - containerPort: {{ .Values.redis.containerPort }}
               name: redis
           resources:
             limits:

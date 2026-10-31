@@ -9,8 +9,10 @@ spec:
   type: ClusterIP
   clusterIP: None
   ports:
-    - port: { { .Values.database.servicePort } }
-      targetPort: { { .Values.database.containerPort } }
+    # prettier-ignore
+    - port: {{ .Values.database.servicePort }}
+      # prettier-ignore
+      targetPort: {{ .Values.database.containerPort }}
       protocol: TCP
       name: mysql
   selector:

@@ -7,7 +7,8 @@ metadata:
     app: "{{ .Values.appName }}-database"
 spec:
   serviceName: "{{ .Values.appName }}-database"
-  replicas: { { .Values.database.replicas } }
+  # prettier-ignore
+  replicas: {{ .Values.database.replicas }}
   selector:
     matchLabels:
       app: "{{ .Values.appName }}-database"
@@ -25,7 +26,8 @@ spec:
           image: "{{ .Values.database.image.repository }}:{{ .Values.database.image.tag }}"
           imagePullPolicy: "{{ .Values.database.image.pullPolicy }}"
           ports:
-            - containerPort: { { .Values.database.containerPort } }
+            # prettier-ignore
+            - containerPort: {{ .Values.database.containerPort }}
               name: mysql
           resources:
             limits:
